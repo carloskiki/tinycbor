@@ -1,0 +1,52 @@
+[workspace]
+members = ["derive"]
+
+[package]
+name = "tinycbor"
+version = "0.1.0"
+authors = ["Charles Edward Gagnon"]
+license = "MIT"
+edition = "2024"
+description = "A tiny CBOR codec library."
+repository = "https://github.com/carloskiki/tinycbor"
+keywords = ["cbor", "serialization", "encoding", "no_std"]
+categories = ["encoding"]
+
+[package.metadata.docs.rs]
+rustdoc-args = [
+    "--generate-link-to-definition",
+    "--generate-macro-expansion",
+    "--extern-html-root-url=core=https://doc.rust-lang.org",
+    "--extern-html-root-url=alloc=https://doc.rust-lang.org",
+    "--extern-html-root-url=std=https://doc.rust-lang.org",
+]
+
+[features]
+default = ["std"]
+alloc = ["embedded-io/alloc", "const-hex/alloc"]
+std = ["alloc", "embedded-io/std", "const-hex/std"]
+
+[dependencies]
+embedded-io = "0.7.1"
+
+[dev-dependencies]
+embedded-io = { version = "0.7", features = ["std"] }
+const-hex = { version = "1", default-features = false }
+
+tinycbor-derive = { path = "derive" }
+serde = { version = "1", features = ["derive"] }
+cbor4ii = { version = "1", features = ["serde1", "use_std"] }
+
+rand = "0.9"
+
+proptest = "1"
+proptest-derive = "0.7"
+criterion = "0.8"
+
+[[bin]]
+name = "cbor-display"
+required-features = ["std"]
+
+[[bench]]
+name = "address-book"
+harness = false
