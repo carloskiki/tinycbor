@@ -11,9 +11,11 @@ coverage:
         # Avoid false negatives
         threshold: 1%
 
-# Test files aren't important for coverage
 ignore:
+  # Test files aren't important for coverage
   - "tests"
+  # Ignore binary entry points
+  - "src/bin"
 
 # Make comments less noisy
 comment:
