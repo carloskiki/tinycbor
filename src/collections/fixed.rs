@@ -1,7 +1,7 @@
 //! Fixed length collections and structures.
 use core::mem::MaybeUninit;
 
-use crate::{CborLen, Decode, Decoder, Encode, collections};
+use crate::{CborLen, Decode, Decoder, Encode};
 
 /// An error that can occur when decoding fixed length structures and collections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -11,7 +11,7 @@ pub enum Error<E> {
     /// Unexpected surplus elements.
     Surplus,
     /// Either the header or an element caused an error.
-    Collection(collections::Error<E>),
+    Collection(super::Error<E>),
 }
 
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
@@ -24,8 +24,8 @@ impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     }
 }
 
-impl<E> From<collections::Error<E>> for Error<E> {
-    fn from(e: collections::Error<E>) -> Self {
+impl<E> From<super::Error<E>> for Error<E> {
+    fn from(e: super::Error<E>) -> Self {
         Error::Collection(e)
     }
 }
@@ -40,6 +40,36 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     }
 }
 
+// Guard to prevent memory leaks in the case of a panic during decoding. This is not
+// strictly nessessary as leaks are allowed in the Rust memory safety model, but this is
+// nice to have if a dependent decides to catch unwinding panics. Our library won't cause a
+// memory leak in that case.
+struct Guard<T, const N: usize> {
+    data: [MaybeUninit<T>; N],
+    initialized: usize,
+}
+
+impl<T, const N: usize> Guard<T, N> {
+    /// Safety: Caller must ensure that all elements up to `count` are initialized.
+    unsafe fn assume_init(mut self) -> [T; N] {
+        let data = core::mem::replace(&mut self.data, [const { MaybeUninit::uninit() }; N]);
+        // Don't drop the guard anymore, becuase it contains uninitialized elements.
+        let _ = core::mem::ManuallyDrop::new(self);
+
+        // Safety: Caller has ensured that all elements are initialized.
+        unsafe { data.as_ptr().cast::<[T; N]>().read() }
+    }
+}
+
+impl<T, const N: usize> Drop for Guard<T, N> {
+    fn drop(&mut self) {
+        for i in 0..self.initialized {
+            // Safety: We only drop initialized elements.
+            unsafe { self.data[i].assume_init_drop() };
+        }
+    }
+}
+
 impl<'a, T, const N: usize> Decode<'a> for [T; N]
 where
     T: Decode<'a>,
@@ -47,25 +77,7 @@ where
     type Error = Error<T::Error>;
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
-        // Guard to prevent memory leaks in the case of a panic during decoding. This is not
-        // strictly nessessary as leaks are allowed in the Rust memory safety model, but this is
-        // nice to have if a dependent decides to catch unwinding panics. Our library won't cause a
-        // memory leak in that case.
-        struct Guard<T, const N: usize> {
-            data: [MaybeUninit<T>; N],
-            initialized: usize,
-        }
-
-        impl<T, const N: usize> Drop for Guard<T, N> {
-            fn drop(&mut self) {
-                for i in 0..self.initialized {
-                    // Safety: We only drop initialized elements.
-                    unsafe { self.data[i].assume_init_drop() };
-                }
-            }
-        }
-
-        let mut visitor = d.array_visitor().map_err(collections::Error::Malformed)?;
+        let mut visitor = d.array_visitor().map_err(super::Error::Malformed)?;
         let mut guard = Guard {
             data: [const { MaybeUninit::uninit() }; N],
             initialized: 0,
@@ -76,20 +88,18 @@ where
                 visitor
                     .visit::<T>()
                     .ok_or(Error::Missing)?
-                    .map_err(collections::Error::Element)?,
+                    .map_err(super::Error::Element)?,
             );
             guard.initialized += 1;
         }
+        // Safety: All elements have been initialized.
+        let array = unsafe { guard.assume_init() };
+
         if visitor.remaining() != Some(0) {
             return Err(Error::Surplus);
         }
 
-        let data = core::mem::replace(&mut guard.data, [const { MaybeUninit::uninit() }; N]);
-        // Don't drop the guard anymore, becuase it contains uninitialized elements.
-        let _ = core::mem::ManuallyDrop::new(guard);
-
-        // Safety: All elements have been initialized.
-        Ok(unsafe { data.as_ptr().cast::<[T; N]>().read() })
+        Ok(array)
     }
 }
 
@@ -106,6 +116,61 @@ impl<T: Encode, const N: usize> Encode for [T; N] {
 impl<T: CborLen, const N: usize> CborLen for [T; N] {
     fn cbor_len(&self) -> usize {
         N.cbor_len() + self.iter().map(|x| x.cbor_len()).sum::<usize>()
+    }
+}
+
+// Map encoding
+
+impl<'a, K, V, const N: usize> Decode<'a> for [(K, V); N]
+where
+    K: Decode<'a>,
+    V: Decode<'a>,
+{
+    type Error = Error<super::map::Error<K::Error, V::Error>>;
+
+    fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
+        let mut visitor = d.map_visitor().map_err(super::Error::Malformed)?;
+        let mut guard = Guard {
+            data: [const { MaybeUninit::uninit() }; N],
+            initialized: 0,
+        };
+
+        for elem in &mut guard.data {
+            let v = visitor
+                .visit()
+                .ok_or(Error::Missing)?
+                .map_err(super::Error::Element)?;
+            elem.write(v);
+            guard.initialized += 1;
+        }
+        // Safety: All elements have been initialized.
+        let array = unsafe { guard.assume_init() };
+
+        if visitor.remaining() != Some(0) {
+            return Err(Error::Surplus);
+        }
+        Ok(array)
+    }
+}
+
+impl<K: Encode, V: Encode, const N: usize> Encode for [(K, V); N] {
+    fn encode<W: embedded_io::Write>(&self, e: &mut crate::Encoder<W>) -> Result<(), W::Error> {
+        e.map(N)?;
+        for (k, v) in self {
+            k.encode(e)?;
+            v.encode(e)?;
+        }
+        Ok(())
+    }
+}
+
+impl<K: CborLen, V: CborLen, const N: usize> CborLen for [(K, V); N] {
+    fn cbor_len(&self) -> usize {
+        N.cbor_len()
+            + self
+                .iter()
+                .map(|(k, v)| k.cbor_len() + v.cbor_len())
+                .sum::<usize>()
     }
 }
 
@@ -185,5 +250,16 @@ mod tests {
         }
 
         assert!(test(arr, &cbor).unwrap());
+    }
+
+    #[test]
+    fn map() {
+        assert!(
+            test(
+                [("a", 1u16), ("b", 2u16)],
+                &[0xA2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x02]
+            )
+            .unwrap()
+        );
     }
 }
