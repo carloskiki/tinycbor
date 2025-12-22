@@ -7,6 +7,7 @@ description = "Derive tinycbor `Decode` and `Encode` traits."
 repository = "" # TODO
 keywords = ["cbor", "serialization", "encoding", "no_std"]
 categories = ["encoding"]
+rust-version = "1.85.1"
 
 [lib]
 proc-macro = true

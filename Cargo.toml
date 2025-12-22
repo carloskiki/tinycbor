@@ -11,6 +11,7 @@ description = "A tiny CBOR codec library."
 repository = "https://github.com/carloskiki/tinycbor"
 keywords = ["cbor", "serialization", "encoding", "no_std"]
 categories = ["encoding"]
+rust-version = "1.85.1"
 
 [package.metadata.docs.rs]
 rustdoc-args = [
@@ -31,7 +32,7 @@ embedded-io = "0.7.1"
 
 [dev-dependencies]
 embedded-io = { version = "0.7", features = ["std"] }
-const-hex = { version = "1", default-features = false }
+const-hex = { version = "1.17", default-features = false }
 
 tinycbor-derive = { path = "derive" }
 serde = { version = "1", features = ["derive"] }
@@ -39,7 +40,7 @@ cbor4ii = { version = "1", features = ["serde1", "use_std"] }
 
 rand = "0.9"
 
-proptest = "1"
+proptest = "1.9"
 proptest-derive = "0.7"
 criterion = "0.8"
 
