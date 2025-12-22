@@ -133,7 +133,9 @@ where
             .peek()
             .map_err(|e| Error::Malformed(primitive::Error::from(e)))?;
         if TAGGED != type_of(b) {
-            return Err(Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader)));
+            return Err(Error::Malformed(primitive::Error::InvalidHeader(
+                InvalidHeader,
+            )));
         }
         if d.unsigned().map_err(Error::Malformed)? != N {
             return Err(Error::InvalidTag);
@@ -317,6 +319,9 @@ mod tests {
         use crate::Decoder;
         let cbor = [0x18, 0x2a];
         let err = <Tagged<u32, 0>>::decode(&mut Decoder(&cbor)).unwrap_err();
-        assert_eq!(err, Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader)));
+        assert_eq!(
+            err,
+            Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader))
+        );
     }
 }

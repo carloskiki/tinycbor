@@ -25,7 +25,7 @@ impl<E> From<E> for Error<E> {
     }
 }
 
-impl <E: core::error::Error + 'static> core::error::Error for Error<E> {
+impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Error::Zero => None,
@@ -86,17 +86,23 @@ impl CborLen for core::num::NonZeroU8 {
 
 #[cfg(test)]
 mod tests {
+    use crate::{Decode, test};
     use core::num::*;
-    use crate::{test, Decode};
 
     #[test]
     fn nonzero() {
         assert!(test(NonZeroU8::new(1).unwrap(), &[0x01]).unwrap());
         assert!(test(NonZeroU8::new(42).unwrap(), &[0x18, 0x2a]).unwrap());
         assert!(test(NonZeroU16::new(256).unwrap(), &[0x19, 0x01, 0x00]).unwrap());
-        assert!(test(NonZeroU32::new(65536).unwrap(), &[0x1a, 0x00, 0x01, 0x00, 0x00]).unwrap());
+        assert!(
+            test(
+                NonZeroU32::new(65536).unwrap(),
+                &[0x1a, 0x00, 0x01, 0x00, 0x00]
+            )
+            .unwrap()
+        );
         assert!(test(NonZeroU64::new(1).unwrap(), &[0x01]).unwrap());
-        
+
         assert!(test(NonZeroI8::new(-1).unwrap(), &[0x20]).unwrap());
         assert!(test(NonZeroI16::new(-256).unwrap(), &[0x38, 0xff]).unwrap());
         assert!(test(NonZeroI32::new(100).unwrap(), &[0x18, 0x64]).unwrap());
@@ -106,14 +112,14 @@ mod tests {
     #[test]
     fn zero() {
         use crate::Decoder;
-        
+
         let cbor = [0x00];
         let err = NonZeroU8::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, super::Error::Zero);
-        
+
         let err = NonZeroU16::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, super::Error::Zero);
-        
+
         let err = NonZeroI32::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, super::Error::Zero);
     }

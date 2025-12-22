@@ -1,5 +1,7 @@
 //! Numeric types.
-use crate::{CborLen, Decode, Decoder, Encode, Encoder, EndOfInput, InvalidHeader, SIGNED, SIMPLE, primitive};
+use crate::{
+    CborLen, Decode, Decoder, Encode, Encoder, EndOfInput, InvalidHeader, SIGNED, SIMPLE, primitive,
+};
 
 pub mod nonzero;
 
@@ -613,7 +615,11 @@ impl Decode<'_> for f32 {
                 }
                 narrowed
             }
-            _ => return Err(Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader))),
+            _ => {
+                return Err(Error::Malformed(primitive::Error::InvalidHeader(
+                    InvalidHeader,
+                )));
+            }
         })
     }
 }
@@ -690,7 +696,7 @@ impl CborLen for f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test, Decode};
+    use crate::{Decode, test};
 
     #[test]
     fn u64() {
@@ -708,31 +714,73 @@ mod tests {
         assert!(test::<u64>(65536, &[0x1a, 0x00, 0x01, 0x00, 0x00]).unwrap());
         assert!(test::<u64>(4294967295, &[0x1a, 0xff, 0xff, 0xff, 0xff]).unwrap());
         // Values > 4294967295 should encode in 9 bytes
-        assert!(test::<u64>(4294967296, &[0x1b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]).unwrap());
-        assert!(test::<u64>(u64::MAX, &[0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap());
+        assert!(
+            test::<u64>(
+                4294967296,
+                &[0x1b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
+            )
+            .unwrap()
+        );
+        assert!(
+            test::<u64>(
+                u64::MAX,
+                &[0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+            )
+            .unwrap()
+        );
     }
 
     #[test]
     fn i64() {
         assert!(test::<i64>(0, &[0x00]).unwrap());
         assert!(test::<i64>(23, &[0x17]).unwrap());
-        assert!(test::<i64>(i64::MAX, &[0x1b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap());
+        assert!(
+            test::<i64>(
+                i64::MAX,
+                &[0x1b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+            )
+            .unwrap()
+        );
         // Negative values use major type 1
         assert!(test::<i64>(-1, &[0x20]).unwrap());
         assert!(test::<i64>(-24, &[0x37]).unwrap());
         assert!(test::<i64>(-25, &[0x38, 0x18]).unwrap());
         assert!(test::<i64>(-256, &[0x38, 0xff]).unwrap());
-        assert!(test::<i64>(i64::MIN, &[0x3b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap());
+        assert!(
+            test::<i64>(
+                i64::MIN,
+                &[0x3b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+            )
+            .unwrap()
+        );
     }
 
     #[test]
     fn int_full_range() {
         // Test Int type with full CBOR integer range
-        let pos_max = Int { negative: false, bits: u64::MAX };
-        assert!(test::<Int>(pos_max, &[0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap());
+        let pos_max = Int {
+            negative: false,
+            bits: u64::MAX,
+        };
+        assert!(
+            test::<Int>(
+                pos_max,
+                &[0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+            )
+            .unwrap()
+        );
 
-        let neg_max = Int { negative: true, bits: u64::MAX };
-        assert!(test::<Int>(neg_max, &[0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]).unwrap());
+        let neg_max = Int {
+            negative: true,
+            bits: u64::MAX,
+        };
+        assert!(
+            test::<Int>(
+                neg_max,
+                &[0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -740,10 +788,10 @@ mod tests {
         // -(2^64 - 1) = -18446744073709551615 can only be decoded into Int
         use crate::Decoder;
         let cbor = [0x3b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
-        
+
         // Should work for Int
         assert!(Int::decode(&mut Decoder(&cbor)).is_ok());
-        
+
         // Should fail for i64 due to narrowing
         let err = i64::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
@@ -752,25 +800,25 @@ mod tests {
     #[test]
     fn narrowing() {
         use crate::Decoder;
-        
+
         // Value too large for u32
         let cbor = [0x1b, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
         let err = u32::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
-        
+
         // Value too large for u16
         let cbor = [0x19, 0xff, 0xff];
         assert!(u16::decode(&mut Decoder(&cbor)).is_ok());
-        
+
         let cbor = [0x1a, 0x00, 0x01, 0x00, 0x00];
         let err = u16::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
-        
+
         // Value too large for i32
         let cbor = [0x1b, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00];
         let err = i32::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
-        
+
         // Negative value too small for i32
         let cbor = [0x3b, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00];
         let err = i32::decode(&mut Decoder(&cbor)).unwrap_err();
@@ -782,7 +830,7 @@ mod tests {
         assert!(test(U8(0), &[0x00]).unwrap());
         assert!(test(U8(42), &[0x18, 0x2a]).unwrap());
         assert!(test(U8(255), &[0x18, 0xff]).unwrap());
-        
+
         let cbor = [0x19, 0x01, 0x00]; // 256
         let err = U8::decode(&mut crate::Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
@@ -794,7 +842,7 @@ mod tests {
         assert!(test::<f32>(0.0, &[0xf9, 0x00, 0x00]).unwrap());
         assert!(test::<f32>(1.0, &[0xf9, 0x3c, 0x00]).unwrap());
         assert!(test::<f32>(-2.0, &[0xf9, 0xc0, 0x00]).unwrap());
-        
+
         // Values requiring f32 precision should encode in 5 bytes
         let val = 1.1f32;
         let cbor = [0xfa, 0x3f, 0x8c, 0xcc, 0xcd];
@@ -807,25 +855,24 @@ mod tests {
         // f64 can decode from all float formats
         let cbor_f16 = [0xf9, 0x3c, 0x00];
         assert_eq!(f64::decode(&mut Decoder(&cbor_f16)).unwrap(), 1.0);
-        
+
         let cbor_f32 = [0xfa, 0x3f, 0x80, 0x00, 0x00];
         assert_eq!(f64::decode(&mut Decoder(&cbor_f32)).unwrap(), 1.0);
-        
+
         let cbor_f64 = [0xfb, 0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         assert_eq!(f64::decode(&mut Decoder(&cbor_f64)).unwrap(), 1.0);
 
-        
         // f64 values that can be represented exactly in f16 should encode in 3 bytes
         assert!(test::<f64>(1.0, &[0xf9, 0x3c, 0x00]).unwrap());
         assert!(test::<f64>(-2.0, &[0xf9, 0xc0, 0x00]).unwrap());
-        
+
         // Values requiring f64 precision should encode in 9 bytes
         let val = core::f64::consts::PI;
         let cbor = [0xfb, 0x40, 0x09, 0x21, 0xfb, 0x54, 0x44, 0x2d, 0x18];
         assert!(test::<f64>(val, &cbor).unwrap());
         let err = f32::decode(&mut Decoder(&cbor)).unwrap_err();
         assert_eq!(err, Error::Narrowing);
-        
+
         // f64 values that fit in f32 but not f16 should encode in 5 bytes
         // Using a value that is exactly representable in f32
         let val = 3.00006103515625f64; // Exactly representable in f32
@@ -838,16 +885,16 @@ mod tests {
         // Test special float values
         assert!(test::<f32>(f32::INFINITY, &[0xf9, 0x7c, 0x00]).unwrap());
         assert!(test::<f32>(f32::NEG_INFINITY, &[0xf9, 0xfc, 0x00]).unwrap());
-        
+
         assert!(test::<f64>(f64::INFINITY, &[0xf9, 0x7c, 0x00]).unwrap());
         assert!(test::<f64>(f64::NEG_INFINITY, &[0xf9, 0xfc, 0x00]).unwrap());
 
         // NaN encoding (specific NaN bit pattern may vary)
-        use crate::{Encoder, Decoder};
+        use crate::{Decoder, Encoder};
         let mut buf = Vec::new();
         f32::NAN.encode(&mut Encoder(&mut buf)).unwrap();
         assert!(f32::decode(&mut Decoder(&buf)).unwrap().is_nan());
-        
+
         buf.clear();
         f64::NAN.encode(&mut Encoder(&mut buf)).unwrap();
         assert!(f64::decode(&mut Decoder(&buf)).unwrap().is_nan());
@@ -856,12 +903,48 @@ mod tests {
     #[test]
     fn int() {
         // Test Int conversions
-        assert_eq!(Int::from(42u64), Int { negative: false, bits: 42 });
-        assert_eq!(Int::from(-1i64), Int { negative: true, bits: 0 });
-        assert_eq!(Int::from(-100i64), Int { negative: true, bits: 99 });
-        
-        assert_eq!(i128::from(Int { negative: false, bits: 42 }), 42);
-        assert_eq!(i128::from(Int { negative: true, bits: 0 }), -1);
-        assert_eq!(i128::from(Int { negative: true, bits: 99 }), -100);
+        assert_eq!(
+            Int::from(42u64),
+            Int {
+                negative: false,
+                bits: 42
+            }
+        );
+        assert_eq!(
+            Int::from(-1i64),
+            Int {
+                negative: true,
+                bits: 0
+            }
+        );
+        assert_eq!(
+            Int::from(-100i64),
+            Int {
+                negative: true,
+                bits: 99
+            }
+        );
+
+        assert_eq!(
+            i128::from(Int {
+                negative: false,
+                bits: 42
+            }),
+            42
+        );
+        assert_eq!(
+            i128::from(Int {
+                negative: true,
+                bits: 0
+            }),
+            -1
+        );
+        assert_eq!(
+            i128::from(Int {
+                negative: true,
+                bits: 99
+            }),
+            -100
+        );
     }
 }

@@ -4,14 +4,14 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens as _, quote};
 use syn::{Ident, spanned::Spanned as _, visit_mut::VisitMut};
 
-mod variant;
 mod field;
+mod variant;
 
 pub use field::{Field, MapField};
 
 use crate::ast::{
-    variant::{TagOnly, Variant},
     field::parse_fields,
+    variant::{TagOnly, Variant},
 };
 
 /// A container that derives `Encode`, `Decode`, or `CborLen`.
@@ -124,15 +124,18 @@ impl Container {
                     ..
                 },
             data,
-            original: syn::DeriveInput {
-                ident, mut generics, ..
-            },
+            original:
+                syn::DeriveInput {
+                    ident,
+                    mut generics,
+                    ..
+                },
             ..
         } = self;
         let where_clause = generics.make_where_clause();
         where_clause.predicates.extend(bound);
         where_clause.predicates.extend(encode_bound);
-        
+
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
         let procedure = data.encode();
@@ -184,9 +187,12 @@ impl Container {
                 bound, len_bound, ..
             },
             data,
-            original: syn::DeriveInput {
-                ident, mut generics, ..
-            },
+            original:
+                syn::DeriveInput {
+                    ident,
+                    mut generics,
+                    ..
+                },
             ..
         } = self;
         let where_clause = generics.make_where_clause();
@@ -204,7 +210,7 @@ impl Container {
                 fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
                     value == &T::default()
                 }
-                
+
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::CborLen for #ident #ty_generics
                     #where_clause
@@ -442,7 +448,8 @@ impl Data {
                         }
                     })
                     .collect::<Vec<_>>();
-                let output = quote! { ::tinycbor::collections::fixed::Error<__Error<#(#generic_tys),*>> };
+                let output =
+                    quote! { ::tinycbor::collections::fixed::Error<__Error<#(#generic_tys),*>> };
                 output
             }
             Data::Map(fields) => {
@@ -522,20 +529,23 @@ impl Data {
                 },
             ),
             Data::Enum(variants) => {
-                let iter = variants.iter().flat_map(|v| {
-                    let field_count = v.fields.len();
-                    v.fields.iter().map(move |f| {
-                        let variant_name = if field_count == 1 {
-                            v.index.0.ident.clone()
-                        } else {
-                            quote::format_ident!("{}{}", v.index.0.ident, f.error_name())
-                        };
-                        
-                        (f.error_message(), variant_name)
+                let iter = variants
+                    .iter()
+                    .flat_map(|v| {
+                        let field_count = v.fields.len();
+                        v.fields.iter().map(move |f| {
+                            let variant_name = if field_count == 1 {
+                                v.index.0.ident.clone()
+                            } else {
+                                quote::format_ident!("{}{}", v.index.0.ident, f.error_name())
+                            };
+
+                            (f.error_message(), variant_name)
+                        })
                     })
-                }).collect::<Vec<_>>();
+                    .collect::<Vec<_>>();
                 _impl(iter.into_iter())
-            },
+            }
         };
 
         let generics = self.error_generics();
@@ -619,10 +629,7 @@ impl Data {
             }
             Data::Map(map_fields) => {
                 let field_count = map_fields.len();
-                let variables: Vec<Ident> = map_fields
-                    .iter()
-                    .map(|f| f.field.variable())
-                    .collect();
+                let variables: Vec<Ident> = map_fields.iter().map(|f| f.field.variable()).collect();
                 let (variable_defs, arms, constructors): (
                     Vec<TokenStream>,
                     Vec<TokenStream>,
@@ -735,9 +742,7 @@ impl Data {
         match self {
             Data::Array(fields) => {
                 let field_count = fields.len();
-                let destruct: TokenStream = fields.iter().map(|f| {
-                    f.destruct()
-                }).collect();
+                let destruct: TokenStream = fields.iter().map(|f| f.destruct()).collect();
                 let procedures = fields.into_iter().map(|f| f.encode());
                 quote! {
                     e.array(#field_count)?;
@@ -768,10 +773,8 @@ impl Data {
                         count
                     }
                 };
-                
-                let destruct: TokenStream = map_fields.iter().map(|f| {
-                    f.field.destruct()
-                }).collect();
+
+                let destruct: TokenStream = map_fields.iter().map(|f| f.field.destruct()).collect();
                 let procedures = map_fields.into_iter().map(|f| {
                     let index = f.index;
                     let variable = f.field.variable();
@@ -804,8 +807,7 @@ impl Data {
                         _ => ::core::unreachable!(),
                     }
                 }
-                
-            },
+            }
             Data::Tag(items) => {
                 let arms = items.into_iter().map(TagOnly::encode);
                 quote! {
@@ -822,22 +824,18 @@ impl Data {
         match self {
             Data::Array(fields) => {
                 let field_count = fields.len();
-                let destructure: TokenStream = fields.iter().map(|f| {
-                    f.destruct()
-                }).collect();
+                let destructure: TokenStream = fields.iter().map(|f| f.destruct()).collect();
                 let procedures = fields.into_iter().map(|f| f.len());
                 quote! {
                     let Self { #destructure } = self;
-                    
+
                     <usize as ::tinycbor::CborLen>::cbor_len(&#field_count)
                     #(+ #procedures)*
                 }
             }
             Data::Map(map_fields) => {
                 let field_count_min = map_fields.iter().filter(|f| !f.optional).count();
-                let destruct: TokenStream = map_fields.iter().map(|f| {
-                    f.field.destruct()
-                }).collect();
+                let destruct: TokenStream = map_fields.iter().map(|f| f.field.destruct()).collect();
                 let procedures = map_fields.into_iter().map(|f| {
                     let index = f.index;
                     let variable = f.field.variable();
@@ -861,7 +859,7 @@ impl Data {
                     {
                         let Self { #destruct } = self;
                         let mut count = #field_count_min;
-                        
+
                         #((#procedures) + )*
                         <usize as ::tinycbor::CborLen>::cbor_len(&count)
                     }
@@ -875,7 +873,7 @@ impl Data {
                         _ => ::core::unreachable!(),
                     }
                 }
-            },
+            }
             Data::Tag(items) => {
                 let arms = items.into_iter().map(TagOnly::len);
                 quote! {

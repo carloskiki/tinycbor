@@ -73,7 +73,6 @@ where
     }
 }
 
-
 #[cfg(feature = "alloc")]
 macro_rules! encode_map {
     ($($t:ty)*) => {
@@ -117,10 +116,10 @@ mod tests {
     #[cfg(feature = "alloc")]
     fn btreemap() {
         use alloc::collections::BTreeMap;
-        
+
         let mut m = BTreeMap::new();
         assert!(test(m.clone(), &[0xa0]).unwrap());
-        
+
         m.insert(1u32, 2u32);
         m.insert(3u32, 4u32);
         assert!(test(m, &[0xa2, 0x01, 0x02, 0x03, 0x04]).unwrap());
@@ -129,17 +128,17 @@ mod tests {
     #[test]
     #[cfg(feature = "std")]
     fn hashmap() {
+        use crate::{Decode, Decoder, Encode, Encoder};
         use std::collections::HashMap;
-        use crate::{Encoder, Decoder, Encode, Decode};
-        
+
         let m: HashMap<&str, u32> = HashMap::new();
         assert!(test(m, &[0xa0]).unwrap());
-        
+
         // HashMap doesn't guarantee order, so test roundtrip
         let mut m = HashMap::new();
         m.insert("a", 1u32);
         m.insert("b", 2u32);
-        
+
         let mut buf = Vec::new();
         m.encode(&mut Encoder(&mut buf)).unwrap();
         let decoded = HashMap::<&str, u32>::decode(&mut Decoder(&buf)).unwrap();

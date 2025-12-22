@@ -3,8 +3,8 @@ use rand::distr::Alphanumeric;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, iter};
-use tinycbor_derive::{Decode, Encode};
 use tinycbor::{Decode, Encode, Encoder};
+use tinycbor_derive::{Decode, Encode};
 
 #[derive(Debug, Encode, Decode, Serialize, Deserialize)]
 struct AddressBook<'a> {
@@ -66,16 +66,16 @@ fn cbor4ii(c: &mut Criterion) {
 
     c.bench_with_input(BenchmarkId::new("encode/cbor4ii", ""), &book, |b, book| {
         buf.clear();
-        b.iter(|| {
-            cbor4ii::serde::to_writer(&mut buf, book).unwrap()
-        });
+        b.iter(|| cbor4ii::serde::to_writer(&mut buf, book).unwrap());
     });
 
-    c.bench_with_input(BenchmarkId::new("decode/cbor4ii", ""), &bytes, |b, bytes| {
-        b.iter(|| {
-            cbor4ii::serde::from_slice::<AddressBook>(bytes).unwrap()
-        });
-    });
+    c.bench_with_input(
+        BenchmarkId::new("decode/cbor4ii", ""),
+        &bytes,
+        |b, bytes| {
+            b.iter(|| cbor4ii::serde::from_slice::<AddressBook>(bytes).unwrap());
+        },
+    );
 }
 
 fn tinycbor(c: &mut Criterion) {
@@ -89,12 +89,16 @@ fn tinycbor(c: &mut Criterion) {
             let Ok(()) = book.encode(&mut Encoder(&mut buf));
         });
     });
-    c.bench_with_input(BenchmarkId::new("decode/tinycbor", ""), &bytes, |b, bytes| {
-        b.iter(|| {
-            let mut d = tinycbor::Decoder(bytes);
-            AddressBook::decode(&mut d).unwrap();
-        });
-    });
+    c.bench_with_input(
+        BenchmarkId::new("decode/tinycbor", ""),
+        &bytes,
+        |b, bytes| {
+            b.iter(|| {
+                let mut d = tinycbor::Decoder(bytes);
+                AddressBook::decode(&mut d).unwrap();
+            });
+        },
+    );
 }
 
 fn gen_addressbook(n: usize) -> AddressBook<'static> {

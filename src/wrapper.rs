@@ -61,7 +61,7 @@ where
         if let Ok(borrowed) = <&'a T>::decode(d) {
             return Ok(alloc::borrow::Cow::Borrowed(borrowed));
         }
-        
+
         Ok(alloc::borrow::Cow::Owned(T::Owned::decode(d)?))
     }
 }
@@ -185,13 +185,18 @@ mod tests {
         assert!(test::<Option<u32>>(Some(42), &[0x18, 0x2a]).unwrap());
         assert!(test::<Option<i32>>(Some(-100), &[0x38, 0x63]).unwrap());
         assert!(test::<Option<&str>>(None, &[0xf6]).unwrap());
-        assert!(test::<Option<&str>>(Some("hello"), &[0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f]).unwrap());
-        
+        assert!(
+            test::<Option<&str>>(Some("hello"), &[0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f]).unwrap()
+        );
+
         #[cfg(feature = "alloc")]
         {
             use alloc::string::String;
             assert!(test::<Option<String>>(None, &[0xf6]).unwrap());
-            assert!(test::<Option<String>>(Some(String::from("test")), &[0x64, 0x74, 0x65, 0x73, 0x74]).unwrap());
+            assert!(
+                test::<Option<String>>(Some(String::from("test")), &[0x64, 0x74, 0x65, 0x73, 0x74])
+                    .unwrap()
+            );
         }
     }
 }

@@ -69,9 +69,9 @@
 //!     # }
 //! }
 //! ```
-//! 
+//!
 //! For `decode_bound` the predicate is allowed to use the special lifetime `'_`, which is
-//! replaced with the trait input lifetime when deriving `Decode`. 
+//! replaced with the trait input lifetime when deriving `Decode`.
 //!
 //! ```no_run
 //! use std::borrow::Cow;
@@ -180,7 +180,7 @@
 //! ```
 //!
 //! ### Map encoding
-//! 
+//!
 //! When map encoding is used, the fields are encoded as values within a map, with `u64` keys.
 //! The `Decode` implementation allows for both definite and indefinite length maps. All fields
 //! must be present in the encoded map (unless [`#[cbor(optional)]`](#cboroptional) is used),
@@ -202,7 +202,7 @@
 //!     #[n(2)]
 //!     password_hash: [u8; 32],
 //! }
-//! 
+//!
 //! let encoded = to_vec(
 //!     &Account {
 //!         email: "me@yahoo.com".to_string(),
@@ -264,7 +264,7 @@
 //! ```
 //!
 //! __Interaction with [`#[cbor(with = "<Type>")]`](#cborencode_decode_len_with--type)__
-//! 
+//!
 //! When using `with` on an optional field, the original field type's `Default` implementation is
 //! used for field initialization and encoding checks, rather than the type provided to `with`.
 //!

@@ -242,7 +242,7 @@ mod tests {
             assert!(test::<HashSet<&str>>(HashSet::new(), EMPTY_ARRAY).unwrap());
             test(
                 HashSet::from(["foo", "bar"]),
-                &[0x82, 0x63, 0x66, 0x6f, 0x6f, 0x63, 0x62, 0x61, 0x72]
+                &[0x82, 0x63, 0x66, 0x6f, 0x6f, 0x63, 0x62, 0x61, 0x72],
             )
             .unwrap();
         }

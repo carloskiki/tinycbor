@@ -110,7 +110,9 @@ impl<const N: usize> CborLen for [u8; N] {
 #[cfg(test)]
 mod tests {
     use crate::{
-        InvalidHeader, collections::{self, fixed}, test
+        InvalidHeader,
+        collections::{self, fixed},
+        test,
     };
 
     #[test]

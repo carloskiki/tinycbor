@@ -1,5 +1,7 @@
 //! Text.
-use crate::{CborLen, Decode, Decoder, Encode, Encoder, InvalidHeader, TEXT, info_of, primitive, type_of};
+use crate::{
+    CborLen, Decode, Decoder, Encode, Encoder, InvalidHeader, TEXT, info_of, primitive, type_of,
+};
 
 /// Errors which can occur when decoding a UTF-8 string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +61,9 @@ where
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let b = d.peek().map_err(primitive::Error::from)?;
         if TEXT != type_of(b) || info_of(b) == 31 {
-            return Err(Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader)));
+            return Err(Error::Malformed(primitive::Error::InvalidHeader(
+                InvalidHeader,
+            )));
         }
         let n = d.length()?;
         let s = d.read_slice(n).map_err(primitive::Error::from)?;
@@ -199,9 +203,7 @@ mod tests {
         let err = test::<&str>("", &[0x7F, 0x60, 0xFF]).unwrap_err();
         assert_eq!(
             err,
-            super::Error::Malformed(crate::primitive::Error::InvalidHeader(
-                InvalidHeader
-            ))
+            super::Error::Malformed(crate::primitive::Error::InvalidHeader(InvalidHeader))
         );
 
         #[cfg(feature = "alloc")]
