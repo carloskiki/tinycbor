@@ -148,10 +148,7 @@ proptest! {
 fn config() -> proptest::test_runner::Config {
     proptest::test_runner::Config {
         cases: 500,
-        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/proptest-failures.txt"
-        )))),
+        failure_persistence: None,
         ..proptest::test_runner::Config::default()
     }
 }
