@@ -7,7 +7,6 @@ use std::{
 use proptest::{
     prelude::{Strategy, any},
     proptest,
-    test_runner::FileFailurePersistence,
 };
 use proptest_derive::Arbitrary;
 use tinycbor::{
