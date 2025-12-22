@@ -1,7 +1,8 @@
 //! Map-like collections.
 
+use crate::{CborLen, Encode, Encoder};
 #[cfg(feature = "alloc")]
-use crate::{CborLen, Decode, Decoder, Encode, Encoder};
+use crate::{Decode, Decoder};
 
 /// Errors which can occur when decoding a map entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
