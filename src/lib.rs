@@ -682,6 +682,7 @@ impl<'b> Iterator for BytesIter<'_, 'b> {
             State::Indef(false) => {
                 let bytes = Decode::decode(self.decoder);
                 if let Ok(BREAK) = self.decoder.peek() {
+                    self.decoder.read().expect("was peeked");
                     self.state = State::Indef(true);
                 }
                 Some(bytes)
@@ -720,6 +721,7 @@ impl<'b> Iterator for StrIter<'_, 'b> {
             State::Indef(false) => {
                 let s = Decode::decode(self.decoder);
                 if let Ok(BREAK) = self.decoder.peek() {
+                    self.decoder.read().expect("was peeked");
                     self.state = State::Indef(true);
                 }
                 Some(s)
@@ -762,6 +764,7 @@ impl<'b> ArrayVisitor<'_, 'b> {
             State::Indef(false) => {
                 let value = T::decode(self.decoder);
                 if let Ok(BREAK) = self.decoder.peek() {
+                    self.decoder.read().expect("was peeked");
                     self.state = State::Indef(true);
                 }
                 Some(value)
@@ -815,6 +818,7 @@ impl<'b> MapVisitor<'_, 'b> {
             State::Indef(false) => {
                 let key = K::decode(self.decoder);
                 if let Ok(BREAK) = self.decoder.peek() {
+                    self.decoder.read().expect("was peeked");
                     self.state = State::Indef(true);
                 }
                 match key {
