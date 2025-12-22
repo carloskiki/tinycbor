@@ -777,6 +777,10 @@ impl<'b> ArrayVisitor<'_, 'b> {
     pub fn remaining(&self) -> Option<usize> {
         self.state.remaining()
     }
+
+    pub fn definite(&self) -> bool {
+        matches!(self.state, State::Def(_))
+    }
 }
 
 /// A visitor for decoding map key-value pairs of different types.
@@ -832,6 +836,10 @@ impl<'b> MapVisitor<'_, 'b> {
 
     pub fn remaining(&self) -> Option<usize> {
         self.state.remaining()
+    }
+
+    pub fn definite(&self) -> bool {
+        matches!(self.state, State::Def(_))
     }
 }
 
