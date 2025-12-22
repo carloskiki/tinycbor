@@ -3,7 +3,7 @@ members = ["derive"]
 
 [package]
 name = "tinycbor"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Charles Edward Gagnon"]
 license = "MIT"
 edition = "2024"
