@@ -146,7 +146,7 @@ proptest! {
 
 fn config() -> proptest::test_runner::Config {
     proptest::test_runner::Config {
-        cases: 500,
+        cases: if cfg!(miri) { 50 } else { 500 },
         failure_persistence: None,
         ..proptest::test_runner::Config::default()
     }
