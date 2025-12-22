@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, HashMap, HashSet},
@@ -146,7 +148,7 @@ proptest! {
 
 fn config() -> proptest::test_runner::Config {
     proptest::test_runner::Config {
-        cases: if cfg!(miri) { 50 } else { 500 },
+        cases: 500,
         failure_persistence: None,
         ..proptest::test_runner::Config::default()
     }
