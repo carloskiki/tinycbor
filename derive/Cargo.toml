@@ -3,8 +3,8 @@ name = "tinycbor-derive"
 version = "0.1.0"
 authors = ["Charles Edward Gagnon"]
 edition = "2024"
-description = "Derive tinycbor `Decode` and `Encode` traits."
-repository = "" # TODO
+description = "Derive tinycbor traits."
+repository = "https://github.com/carloskiki/tinycbor"
 keywords = ["cbor", "serialization", "encoding", "no_std"]
 categories = ["encoding"]
 rust-version = "1.86.0"
@@ -12,22 +12,8 @@ rust-version = "1.86.0"
 [lib]
 proc-macro = true
 
-[features]
-alloc = []
-std = ["alloc"]
-
 [dependencies]
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "2", features = ["derive", "visit-mut", "extra-traits"] }
+syn = { version = "2", features = ["derive", "visit-mut"] }
 heck = "0.5"
-
-# TODO: remove after testing
-tinycbor = { path = "../", version = "0.1", features = ["std"] }
-
-[dev-dependencies]
-arbitrary = { version = "1", features = ["derive"] }
-tinycbor = { path = "../", version = "0.1", features = ["std"] }
-rand = "0.9"
-trybuild = "1"
-const-hex = "1"
