@@ -65,7 +65,7 @@ where
             }
         }
 
-        let mut visitor = d.array_visitor().map_err(collections::Error::Header)?;
+        let mut visitor = d.array_visitor().map_err(collections::Error::Malformed)?;
         let mut guard = Guard {
             data: [const { MaybeUninit::uninit() }; N],
             initialized: 0,

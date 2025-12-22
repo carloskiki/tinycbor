@@ -10,7 +10,7 @@ use crate::{CborLen, Decode, Encode, Encoder, InvalidHeader, TAGGED, primitive, 
 pub enum Error<E> {
     /// The tagged value is malformed.
     Malformed(primitive::Error),
-    /// The tag value is not the expected one.
+    /// The tag value does not match the expected tag.
     InvalidTag,
     /// An error occurred while decoding the inner value.
     Inner(E),
@@ -141,7 +141,7 @@ where
             return Err(Error::InvalidTag);
         }
 
-        T::decode(d).map(Tagged::<T, N>::from).map_err(Error::Inner)
+        T::decode(d).map(Tagged::<T, N>).map_err(Error::Inner)
     }
 }
 
@@ -155,6 +155,50 @@ impl<const N: u64, T: Encode + ?Sized> Encode for Tagged<T, N> {
 impl<const N: u64, T: CborLen + ?Sized> CborLen for Tagged<T, N> {
     fn cbor_len(&self) -> usize {
         N.cbor_len() + self.0.cbor_len()
+    }
+}
+
+/// Dynamically tag a value.
+///
+/// This allows for any tag on the value.
+pub struct Dynamic<T: ?Sized> {
+    /// The tag value.
+    pub tag: u64,
+    /// The tagged value.
+    pub value: T,
+}
+
+impl<'a, T: Decode<'a>> Decode<'a> for Dynamic<T> {
+    type Error = crate::collections::Error<T::Error>;
+
+    fn decode(d: &mut crate::Decoder<'a>) -> Result<Self, Self::Error> {
+        use crate::collections::Error;
+        let b = d
+            .peek()
+            .map_err(|e| Error::Malformed(primitive::Error::from(e)))?;
+        if TAGGED != type_of(b) {
+            return Err(Error::Malformed(primitive::Error::InvalidHeader(
+                InvalidHeader,
+            )));
+        }
+        let tag = d.unsigned().map_err(Error::Malformed)?;
+
+        let value = T::decode(d).map_err(Error::Element)?;
+
+        Ok(Dynamic { tag, value })
+    }
+}
+
+impl<T: ?Sized + Encode> Encode for Dynamic<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
+        e.type_len(TAGGED, self.tag)?;
+        self.value.encode(e)
+    }
+}
+
+impl<T: ?Sized + CborLen> CborLen for Dynamic<T> {
+    fn cbor_len(&self) -> usize {
+        self.tag.cbor_len() + self.value.cbor_len()
     }
 }
 

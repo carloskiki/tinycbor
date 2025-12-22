@@ -83,7 +83,7 @@ impl<const N: usize> Decode<'_> for [u8; N] {
     type Error = fixed::Error<core::convert::Infallible>;
 
     fn decode(d: &mut Decoder<'_>) -> Result<Self, Self::Error> {
-        let slice: &[u8] = Decode::decode(d).map_err(collections::Error::Header)?;
+        let slice: &[u8] = Decode::decode(d).map_err(collections::Error::Malformed)?;
         if slice.len() < N {
             return Err(fixed::Error::Missing);
         } else if slice.len() > N {
@@ -152,7 +152,7 @@ mod tests {
         let err = test::<[u8; 0]>([], &[0x5F, 0x40, 0xFF]).unwrap_err();
         assert_eq!(
             err,
-            fixed::Error::Collection(collections::Error::Header(
+            fixed::Error::Collection(collections::Error::Malformed(
                 crate::primitive::Error::InvalidHeader(InvalidHeader)
             ))
         );

@@ -7,11 +7,11 @@ use crate::{Decode, Decoder};
 pub mod fixed;
 pub mod map;
 
-/// Error that can occur when decoding dynamically sized collections.
+/// Error that can occur when decoding dynamic containers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<E> {
-    /// While decoding the container's header.
-    Header(primitive::Error),
+    /// The container header is malformed.
+    Malformed(primitive::Error),
     /// While decoding an element within the container.
     Element(E),
 }
@@ -19,28 +19,28 @@ pub enum Error<E> {
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Header(e) => write!(f, "container header: {}", e),
-            Error::Element(e) => write!(f, "container element: {}", e),
+            Error::Malformed(e) => write!(f, "{e}"),
+            Error::Element(e) => write!(f, "container element: {e}"),
         }
     }
 }
 
 impl<E> From<primitive::Error> for Error<E> {
     fn from(e: primitive::Error) -> Self {
-        Error::Header(e)
+        Error::Malformed(e)
     }
 }
 
 impl<E> From<crate::EndOfInput> for Error<E> {
     fn from(e: crate::EndOfInput) -> Self {
-        Error::Header(primitive::Error::EndOfInput(e))
+        Error::Malformed(primitive::Error::EndOfInput(e))
     }
 }
 
 impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            Error::Header(e) => Some(e),
+            Error::Malformed(e) => Some(e),
             Error::Element(e) => Some(e),
         }
     }

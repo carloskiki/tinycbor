@@ -8,7 +8,7 @@ use crate::{CborLen, Decode, Decoder, Encode, Encoder, EndOfInput, InvalidHeader
 pub enum Error {
     /// The input ended unexpectedly.
     EndOfInput(EndOfInput),
-    /// The type found did not match the expected type.
+    /// The header found did not match the expected header.
     InvalidHeader(InvalidHeader),
 }
 

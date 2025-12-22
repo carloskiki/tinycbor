@@ -616,7 +616,7 @@ impl Data {
                 });
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Header(e))
+                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
                     })?;
                     let result = Self {
                         #(#fields),*
@@ -643,7 +643,7 @@ impl Data {
                     #(#variable_defs)*
 
                     let mut visitor = d.map_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Header(e))
+                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
                     })?;
                     loop {
                         if #(#variables.is_some() &&)* true {
@@ -696,7 +696,7 @@ impl Data {
 
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Header(e))
+                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
                     })?;
                     let tag = visitor
                         .visit::<u64>()
