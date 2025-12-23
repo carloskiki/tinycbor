@@ -1032,6 +1032,94 @@ impl<'b> Decode<'b> for Token<'b> {
     }
 }
 
+/// Encodes as a tagged byte string, where the content is the CBOR encoding of `T`.
+///
+/// Uses [`IanaTag::Cbor`][tag::IanaTag::Cbor] as the tag.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Encoded<T: ?Sized>(pub T);
+
+impl<T> Encoded<T> {
+    /// Unwrap the inner value.
+    pub fn into(self) -> T {
+        self.0
+    }
+}
+
+impl<T> From<T> for Encoded<T> {
+    fn from(value: T) -> Self {
+        Encoded(value)
+    }
+}
+
+impl<T: ?Sized> From<&T> for &Encoded<T> {
+    fn from(value: &T) -> Self {
+        // Safety: `Encoded<T>` is `repr(transparent)` over `T`.
+        unsafe { &*(value as *const T as *const Encoded<T>) }
+    }
+}
+
+impl<T: ?Sized> AsRef<T> for Encoded<T> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> AsMut<T> for Encoded<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<T: ?Sized> core::ops::Deref for Encoded<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: ?Sized> core::ops::DerefMut for Encoded<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<T: ?Sized + CborLen> CborLen for Encoded<T> {
+    fn cbor_len(&self) -> usize {
+        let len = self.0.cbor_len();
+        (tag::IanaTag::Cbor as u64).cbor_len() +  // tag
+        len.cbor_len() +                     // bytes header
+        len // content
+    }
+}
+
+impl<T: ?Sized + Encode + CborLen> Encode for Encoded<T> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
+        e.type_len(TAGGED, tag::IanaTag::Cbor as u64)?;
+        e.type_len(BYTES, self.0.cbor_len() as u64)?;
+        self.0.encode(e)
+    }
+}
+
+impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
+    type Error = tag::Error<collections::Error<T::Error>>;
+
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+        let tag::Tagged(bytes) = tag::Tagged::<&'b [u8], { tag::IanaTag::Cbor as u64 }>::decode(d)
+            .map_err(|e| match e {
+                tag::Error::InvalidTag => tag::Error::InvalidTag,
+                tag::Error::Inner(e) => tag::Error::Inner(collections::Error::Malformed(e)),
+                tag::Error::Malformed(e) => tag::Error::Malformed(e),
+            })?;
+
+        let mut inner_decoder = Decoder(bytes);
+        T::decode(&mut inner_decoder)
+            .map(Encoded)
+            .map_err(|e| tag::Error::Inner(collections::Error::Element(e)))
+    }
+}
+
 /// Returns `true` if `value.encode() == bytes`, false otherwise.
 ///
 /// Panics when:

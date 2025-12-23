@@ -69,9 +69,10 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
 #[repr(transparent)]
 pub struct Tagged<T: ?Sized, const N: u64>(pub T);
 
-impl<T: ?Sized, const N: u64> Tagged<T, N> {
-    pub fn from_ref(val: &T) -> &Self {
-        <&Self>::from(val)
+impl<T, const N: u64> Tagged<T, N> {
+    /// Unwrap the tagged value.
+    pub fn into(self) -> T {
+        self.0
     }
 }
 
@@ -88,23 +89,17 @@ impl<'a, T: ?Sized, const N: u64> From<&'a T> for &'a Tagged<T, N> {
     }
 }
 
-impl<T, U, const N: u64> AsRef<U> for Tagged<T, N>
-where
-    T: ?Sized + AsRef<U>,
-    U: ?Sized,
-{
-    fn as_ref(&self) -> &U {
-        self.0.as_ref()
+impl<T: ?Sized, const N: u64> AsRef<T> for Tagged<T, N> {
+    fn as_ref(&self) -> &T {
+        &self.0
     }
 }
 
-impl<T, U, const N: u64> AsMut<U> for Tagged<T, N>
+impl<T: ?Sized, const N: u64> AsMut<T> for Tagged<T, N>
 where
-    T: ?Sized + AsMut<U>,
-    U: ?Sized,
 {
-    fn as_mut(&mut self) -> &mut U {
-        self.0.as_mut()
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }
 
@@ -155,50 +150,6 @@ impl<const N: u64, T: Encode + ?Sized> Encode for Tagged<T, N> {
 impl<const N: u64, T: CborLen + ?Sized> CborLen for Tagged<T, N> {
     fn cbor_len(&self) -> usize {
         N.cbor_len() + self.0.cbor_len()
-    }
-}
-
-/// Dynamically tag a value.
-///
-/// This allows for any tag on the value.
-pub struct Dynamic<T: ?Sized> {
-    /// The tag value.
-    pub tag: u64,
-    /// The tagged value.
-    pub value: T,
-}
-
-impl<'a, T: Decode<'a>> Decode<'a> for Dynamic<T> {
-    type Error = crate::collections::Error<T::Error>;
-
-    fn decode(d: &mut crate::Decoder<'a>) -> Result<Self, Self::Error> {
-        use crate::collections::Error;
-        let b = d
-            .peek()
-            .map_err(|e| Error::Malformed(primitive::Error::from(e)))?;
-        if TAGGED != type_of(b) {
-            return Err(Error::Malformed(primitive::Error::InvalidHeader(
-                InvalidHeader,
-            )));
-        }
-        let tag = d.unsigned().map_err(Error::Malformed)?;
-
-        let value = T::decode(d).map_err(Error::Element)?;
-
-        Ok(Dynamic { tag, value })
-    }
-}
-
-impl<T: ?Sized + Encode> Encode for Dynamic<T> {
-    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
-        e.type_len(TAGGED, self.tag)?;
-        self.value.encode(e)
-    }
-}
-
-impl<T: ?Sized + CborLen> CborLen for Dynamic<T> {
-    fn cbor_len(&self) -> usize {
-        self.tag.cbor_len() + self.value.cbor_len()
     }
 }
 
