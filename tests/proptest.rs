@@ -12,7 +12,7 @@ use proptest::{
 };
 use proptest_derive::Arbitrary;
 use tinycbor::{
-    CborLen, Decode, Decoder, Encode,
+    CborLen, Decode, Decoder, Encode, Encoded,
     num::Int,
     primitive::{Null, Simple, Undefined},
 };
@@ -113,6 +113,7 @@ struct PartE<T, const N: usize>([T; N]);
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
 struct Complete {
+    #[cbor(with = "Encoded<PartA>")]
     a: PartA,
     b: PartB,
     c: PartC,

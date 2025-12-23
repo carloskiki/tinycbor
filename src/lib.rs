@@ -1088,9 +1088,7 @@ impl<T: ?Sized> core::ops::DerefMut for Encoded<T> {
 impl<T: ?Sized + CborLen> CborLen for Encoded<T> {
     fn cbor_len(&self) -> usize {
         let len = self.0.cbor_len();
-        (tag::IanaTag::Cbor as u64).cbor_len() +  // tag
-        len.cbor_len() +                     // bytes header
-        len // content
+        (tag::IanaTag::Cbor as u64).cbor_len() + len.cbor_len() + len
     }
 }
 

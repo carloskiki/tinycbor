@@ -146,6 +146,9 @@ impl Container {
             }
         });
 
+        let is_default = is_default();
+        let as_ref_fallback = as_ref_fallback();
+
         quote! {
             const _: () = {
                 struct __Empty;
@@ -159,10 +162,9 @@ impl Container {
                     }
                 }
 
-                fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
-                    value == &T::default()
-                }
-
+                #is_default
+                #as_ref_fallback
+                
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::Encode for #ident #ty_generics
                     #where_clause
@@ -204,12 +206,14 @@ impl Container {
 
         let procedure = data.len();
 
+        let is_default = is_default();
+        let as_ref_fallback = as_ref_fallback();
+
         quote! {
 
             const _: () = {
-                fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
-                    value == &T::default()
-                }
+                #is_default
+                #as_ref_fallback
 
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::CborLen for #ident #ty_generics
@@ -992,4 +996,30 @@ fn meta_index(index: &mut Option<u64>, meta: &syn::meta::ParseNestedMeta) -> syn
     *index = Some(val.parse::<syn::LitInt>()?.base10_parse::<u64>()?);
 
     Ok(true)
+}
+
+fn is_default() -> TokenStream {
+    quote! {
+        fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
+            value == &T::default()
+        }
+    }
+}
+
+fn as_ref_fallback() -> TokenStream {
+    quote! {
+        trait __AsRefFallback<T> {
+            fn as_ref(&self) -> &T;
+        }
+
+        impl<T, U: ?Sized> __AsRefFallback<T> for &U
+        where
+            for<'a> &'a T: ::core::convert::From<&'a U>,
+        {
+            fn as_ref(&self) -> &T {
+                ::core::convert::From::from(*self)
+            }
+        }
+
+    }
 }

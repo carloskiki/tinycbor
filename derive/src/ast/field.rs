@@ -220,7 +220,7 @@ impl Field {
             input = quote! { #input.as_ref() }
         }
         if let Some(tag) = &self.tag {
-            input = quote! { <::tinycbor::tag::Tagged::<_, #tag>>::from_ref(#input) };
+            input = quote! { <&::tinycbor::tag::Tagged::<_, #tag> as From<&_>>::from(#input) };
         }
 
         let ty = self.encode_ty();
@@ -236,7 +236,7 @@ impl Field {
             input = quote! { #input.as_ref() }
         }
         if let Some(tag) = &self.tag {
-            input = quote! { <::tinycbor::tag::Tagged::<_, #tag>>::from_ref(#input) };
+            input = quote! { <&::tinycbor::tag::Tagged::<_, #tag> as From<&_>>::from(#input) };
         }
 
         let ty = self.len_ty();
