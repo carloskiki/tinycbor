@@ -123,8 +123,8 @@
 //! lifetime.
 //!
 //! When deriving `Encode` or `CborLen` and using `#[cbor({encode_,len_,}with = "<Type>")]`,
-//! `T` must implement `AsRef<<Type>>`, or `&<Type>` must implement `From<&T>` where `T` is the
-//! field type.
+//! `T` must implement `AsRef<<Type>>`, or have a method named `as_ref` with signature
+//! `&Self -> &<Type>`, or `&<Type>` must implement `From<&T>` where `T` is the field type.
 //!
 //! ```no_run
 //! use tinycbor_derive::{Encode, Decode, CborLen};
