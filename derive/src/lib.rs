@@ -118,11 +118,13 @@
 //! Specifies a type that provides custom `Encode`, `Decode` and/or `CborLen` implementation.
 //!
 //! When deriving `Decode` and using `#[cbor({decode_,}with = "<Type>")]`, `<Type>` must implement
-//! `Into<T>` where `T` is the field type. All occurences of `'_` lifetimes within `<Type>` are
-//! replaced with the trait input lifetime.
+//! `Into<T>`, or have a method named `into` with signature `Self -> T`, where `T` is the field
+//! type. All occurences of `'_` lifetimes within `<Type>` are replaced with the trait input
+//! lifetime.
 //!
 //! When deriving `Encode` or `CborLen` and using `#[cbor({encode_,len_,}with = "<Type>")]`,
-//! `T` must implement `AsRef<<Type>>` where `T` is the field type.
+//! `T` must implement `AsRef<<Type>>`, or `&<Type>` must implement `From<&T>` where `T` is the
+//! field type.
 //!
 //! ```no_run
 //! use tinycbor_derive::{Encode, Decode, CborLen};
