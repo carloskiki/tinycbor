@@ -164,7 +164,7 @@ impl Container {
 
                 #is_default
                 #as_ref_fallback
-                
+
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::Encode for #ident #ty_generics
                     #where_clause

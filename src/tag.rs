@@ -95,9 +95,7 @@ impl<T: ?Sized, const N: u64> AsRef<T> for Tagged<T, N> {
     }
 }
 
-impl<T: ?Sized, const N: u64> AsMut<T> for Tagged<T, N>
-where
-{
+impl<T: ?Sized, const N: u64> AsMut<T> for Tagged<T, N> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.0
     }
