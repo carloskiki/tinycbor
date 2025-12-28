@@ -147,7 +147,6 @@ impl Container {
         });
 
         let is_default = is_default();
-        let as_ref_fallback = as_ref_fallback();
 
         quote! {
             const _: () = {
@@ -165,7 +164,6 @@ impl Container {
                 }
 
                 #is_default
-                #as_ref_fallback
 
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::Encode for #ident #ty_generics
@@ -209,7 +207,6 @@ impl Container {
         let procedure = data.len();
 
         let is_default = is_default();
-        let as_ref_fallback = as_ref_fallback();
 
         quote! {
 
@@ -217,7 +214,6 @@ impl Container {
                 use ::core::convert::{AsRef, Into};
 
                 #is_default
-                #as_ref_fallback
 
                 #[automatically_derived]
                 impl #impl_generics ::tinycbor::CborLen for #ident #ty_generics
@@ -1006,28 +1002,6 @@ fn is_default() -> TokenStream {
     quote! {
         fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
             value == &T::default()
-        }
-    }
-}
-
-// Variant of autoref specialization that uses the priority of inherent impls over trait impls.
-//
-// We use this method instead of using the classic autoref specialization because this is fully
-// hygienic, there is no risk of conflicting methods if the type happens to have a method with the
-// same name as our name of choice.
-fn as_ref_fallback() -> TokenStream {
-    quote! {
-        trait AsRefFallback<T> {
-            fn _as_ref(&self) -> &T;
-        }
-
-        impl<T, U> AsRefFallback<T> for &U
-        where
-            U: AsRef<T>,
-        {
-            fn _as_ref(&self) -> &T {
-                self.as_ref()
-            }
         }
     }
 }
