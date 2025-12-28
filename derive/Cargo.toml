@@ -1,6 +1,6 @@
 [package]
 name = "tinycbor-derive"
-version = "0.3.0" # Also bump lockstep when updating.
+version = "0.4.0" # Also bump lockstep when updating.
 authors = ["Charles Edward Gagnon"]
 edition = "2024"
 description = "Derive tinycbor traits."
@@ -23,7 +23,7 @@ tinycbor = { path = "../" } # TODO: remove
 
 # Keep the main crate in sync, preventing version mismatches.
 [target.'cfg(false)'.dependencies]
-tinycbor = { version = "0.3.0", path = "../" }
+tinycbor = { version = "0.4.0", path = "../" }
 
 [dev-dependencies]
 tinycbor = { path = "../" }
