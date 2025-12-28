@@ -142,43 +142,17 @@ impl Field {
     }
 
     pub fn decode_ty(&self) -> TokenStream {
-        self.tagged(
-            self.with
-                .decode_with
-                .as_ref()
-                .or(self.with.with.as_ref())
-                .map(|t| {
-                    let mut ty = t.clone();
-                    super::LifetimeReplacer.visit_type_mut(&mut ty);
-                    ty.into_token_stream()
-                })
-                .unwrap_or(self.ty.to_token_stream()),
-        )
-    }
-
-    pub fn encode_ty(&self) -> TokenStream {
-        self.tagged(
-            self.with
-                .encode_with
-                .as_ref()
-                .or(self.with.with.as_ref())
-                .unwrap_or(&self.ty)
-                .to_token_stream(),
-        )
-    }
-
-    pub fn len_ty(&self) -> TokenStream {
-        self.tagged(
-            self.with
-                .len_with
-                .as_ref()
-                .or(self.with.with.as_ref())
-                .unwrap_or(&self.ty)
-                .to_token_stream(),
-        )
-    }
-
-    fn tagged(&self, ty: TokenStream) -> TokenStream {
+        let ty = self
+            .with
+            .decode_with
+            .as_ref()
+            .or(self.with.with.as_ref())
+            .map(|t| {
+                let mut ty = t.clone();
+                super::LifetimeReplacer.visit_type_mut(&mut ty);
+                ty.into_token_stream()
+            })
+            .unwrap_or(self.ty.to_token_stream());
         if let Some(tag) = self.tag {
             quote! { ::tinycbor::tag::Tagged<#ty, #tag> }
         } else {

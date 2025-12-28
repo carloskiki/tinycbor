@@ -19,8 +19,6 @@ quote = "1"
 syn = { version = "2", features = ["derive", "visit-mut"] }
 heck = "0.5"
 
-tinycbor = { path = "../" } # TODO: remove
-
 # Keep the main crate in sync, preventing version mismatches.
 [target.'cfg(false)'.dependencies]
 tinycbor = { version = "0.4.0", path = "../" }
