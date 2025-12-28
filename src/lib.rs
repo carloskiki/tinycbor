@@ -1118,6 +1118,113 @@ impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
     }
 }
 
+/// Decodes any CBOR data item, keeping its original encoding.
+///
+/// This can be useful to skip over unknown data items while preserving their exact encoding.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Any<'a>(&'a [u8]);
+
+#[cfg(feature = "alloc")]
+impl<'a> core::ops::Deref for Any<'a> {
+    type Target = &'a [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> core::convert::AsRef<[u8]> for Any<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> Decode<'a> for Any<'a> {
+    type Error = string::Error;
+
+    fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
+        enum Frame {
+            Count(usize),
+            IndefArray,
+            IndefMap,
+            IndefBytes,
+            IndefString,
+        }
+        fn top(stack: &[Frame]) -> &Frame {
+            stack.last().expect("stack is non-empty")
+        }
+        fn invalid_header() -> string::Error {
+            string::Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader))
+        }
+
+        let mut stack: Vec<Frame> = vec![Frame::Count(0)];
+        let start = d.0;
+
+        'outer: loop {
+            let token = Token::decode(d)?;
+            if (matches!(top(&stack), Frame::IndefBytes)
+                && !matches!(token, Token::Bytes(_) | Token::Break))
+                || (matches!(top(&stack), Frame::IndefString)
+                    && !matches!(token, Token::String(_) | Token::Break))
+            {
+                return Err(invalid_header());
+            }
+
+            match token {
+                Token::Array(count) => stack.push(Frame::Count(count)),
+                Token::Map(count) => stack.push(Frame::Count(count * 2)),
+
+                Token::BeginBytes => stack.push(Frame::IndefBytes),
+                Token::BeginString => stack.push(Frame::IndefString),
+                Token::BeginArray => stack.push(Frame::IndefArray),
+                Token::BeginMap => stack.push(Frame::IndefMap),
+                Token::Break if !matches!(top(&stack), Frame::Count(_)) => {
+                    stack.pop();
+                }
+                Token::Break => return Err(invalid_header()),
+
+                _ => {}
+            }
+
+            loop {
+                match stack.last() {
+                    Some(Frame::Count(0)) => {
+                        stack.pop();
+                    }
+                    Some(Frame::Count(n)) => {
+                        let n = *n - 1;
+                        *stack.last_mut().expect("stack is non-empty") = Frame::Count(n);
+                        break;
+                    }
+                    None => break 'outer,
+                    _ => break,
+                }
+            }
+        }
+
+        let end = d.0;
+        let len = start.len() - end.len();
+        Ok(Any(&start[..len]))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl Encode for Any<'_> {
+    fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
+        e.0.write_all(self.0)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl CborLen for Any<'_> {
+    fn cbor_len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 /// Returns `true` if `value.encode() == bytes`, false otherwise.
 ///
 /// Panics when:
@@ -1139,4 +1246,37 @@ where
     let decoded = T::decode(&mut Decoder(bytes))?;
     assert_eq!(value, decoded, "decoded value does not match original");
     Ok(buffer.as_slice() == bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use core::num::NonZeroU8;
+
+    use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined};
+
+    #[test]
+    fn any() {
+        let mut encoder = Encoder(Vec::new());
+
+        encoder.map(3);
+        u32::MAX.encode(&mut encoder);
+        "hello world".encode(&mut encoder);
+        encoder.array(2);
+        true.encode(&mut encoder);
+        core::f64::consts::PI.encode(&mut encoder);
+        Undefined.encode(&mut encoder);
+        encoder.begin_map();
+        encoder.begin_str();
+        "key".encode(&mut encoder);
+        encoder.end();
+        encoder.begin_array();
+        [3, 1, 4, 1, 5].encode(&mut encoder);
+        [3u8, 1, 4, 1, 5].encode(&mut encoder);
+        encoder.end();
+        encoder.end();
+        encoder.begin_bytes();
+        encoder.end();
+
+        Any::decode(&mut Decoder(&encoder.0)).unwrap();
+    }
 }
