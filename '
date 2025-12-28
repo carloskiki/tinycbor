@@ -227,30 +227,31 @@ impl Field {
         .or(self.with.with.as_ref())
         {
             ty = with.to_token_stream();
-            input = quote! { #input.into() };
+            input = quote! { &#input.into() };
         }
-        if let Some(tag) = self.tag {
-            let source_ty = ty.clone();
-            ty = quote! { ::tinycbor::tag::Tagged<#ty, #tag> };
-            input = quote! { <&#ty as ::core::convert::From<&#source_ty>>::from(#input) };
-        };
-        (ty, input)
+        if let Some(tag) = self.tag.map(|t| {
+        });
+        todo!()
     }
 
     pub fn encode(self) -> TokenStream {
-        let (ty, input) = self.input::<false>();
+        let preprocess = self.input::<false>();
+        let variable = self.variable();
 
         quote! { {
-            <#ty as ::tinycbor::Encode>::encode(#input, e)?;
+            #preprocess
+            ::tinycbor::Encode::encode(#variable, e)?;
         } }
     }
 
     pub fn len(self) -> TokenStream {
-        let (ty, input) = self.input::<true>();
+        let preprocess = self.input::<true>();
+        let variable = self.variable();
 
-        quote! {
-            <#ty as ::tinycbor::CborLen>::cbor_len(#input)
-        }
+        quote! { ({
+            #preprocess
+            ::tinycbor::CborLen::cbor_len(#variable)
+        }) }
     }
 }
 

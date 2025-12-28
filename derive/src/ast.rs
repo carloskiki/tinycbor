@@ -151,6 +151,8 @@ impl Container {
 
         quote! {
             const _: () = {
+                use ::core::convert::{AsRef, Into};
+
                 struct __Empty;
                 #[automatically_derived]
                 impl ::tinycbor::Encode for __Empty {
@@ -202,7 +204,7 @@ impl Container {
         where_clause.predicates.extend(len_bound);
         let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-        let tag = tag.map(|t| quote! { #t.cbor_len() + });
+        let tag = tag.map(|t| quote! { ::tinycbor::CborLen::cbor_len(&#t) + });
 
         let procedure = data.len();
 
@@ -212,6 +214,8 @@ impl Container {
         quote! {
 
             const _: () = {
+                use ::core::convert::{AsRef, Into};
+
                 #is_default
                 #as_ref_fallback
 
@@ -1006,20 +1010,24 @@ fn is_default() -> TokenStream {
     }
 }
 
+// Variant of autoref specialization that uses the priority of inherent impls over trait impls.
+//
+// We use this method instead of using the classic autoref specialization because this is fully
+// hygienic, there is no risk of conflicting methods if the type happens to have a method with the
+// same name as our name of choice.
 fn as_ref_fallback() -> TokenStream {
     quote! {
-        trait __AsRefFallback<T> {
-            fn as_ref(&self) -> &T;
+        trait AsRefFallback<T> {
+            fn _as_ref(&self) -> &T;
         }
 
-        impl<T, U: ?Sized> __AsRefFallback<T> for &U
+        impl<T, U> AsRefFallback<T> for &U
         where
-            for<'a> &'a T: ::core::convert::From<&'a U>,
+            U: AsRef<T>,
         {
-            fn as_ref(&self) -> &T {
-                ::core::convert::From::from(*self)
+            fn _as_ref(&self) -> &T {
+                self.as_ref()
             }
         }
-
     }
 }

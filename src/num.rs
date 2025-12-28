@@ -220,6 +220,13 @@ impl From<u8> for U8 {
     }
 }
 
+impl From<&u8> for &U8 {
+    fn from(u: &u8) -> Self {
+        // Safety: U8 is #[repr(transparent)] over u8
+        unsafe { &*(u as *const u8 as *const U8) }
+    }
+}
+
 impl AsRef<u8> for U8 {
     fn as_ref(&self) -> &u8 {
         &self.0

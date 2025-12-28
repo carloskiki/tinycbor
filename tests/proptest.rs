@@ -47,7 +47,6 @@ struct PartA {
     #[proptest(value = "Null")]
     a: Null,
     b: u32,
-    #[cbor(with = "&'_ str")]
     c: String,
     d: Vec<u8>,
     #[cbor(tag(42))]

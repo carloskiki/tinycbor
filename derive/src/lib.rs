@@ -123,8 +123,8 @@
 //! lifetime.
 //!
 //! When deriving `Encode` or `CborLen` and using `#[cbor({encode_,len_,}with = "<Type>")]`,
-//! `T` must implement `AsRef<<Type>>`, or have a method named `as_ref` with signature
-//! `&Self -> &<Type>`, or `&<Type>` must implement `From<&T>` where `T` is the field type.
+//! `&T` must implement `Into<&<Type>>`, or have a method named `into` with signature
+//! `&Self -> &<Type>`.
 //!
 //! ```no_run
 //! use tinycbor_derive::{Encode, Decode, CborLen};
@@ -137,6 +137,8 @@
 //!     floor: u8,
 //!     #[cbor(decode_with = "&'_ str")]
 //!     name: String,
+//!     #[cbor(with = "tinycbor::Encoded<Vec<String>>")]
+//!     amenities: Vec<String>,
 //! }
 //!
 //! ```
