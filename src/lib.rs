@@ -1147,7 +1147,7 @@ impl<'a> Decode<'a> for Any<'a> {
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         use alloc::{vec, vec::Vec};
-        
+
         enum Frame {
             Count(usize),
             IndefArray,
