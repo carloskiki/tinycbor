@@ -77,7 +77,7 @@ const BREAK: u8 = 0xff;
 ///
 /// *Requires feature* `"alloc"`.
 #[cfg(feature = "alloc")]
-pub fn to_vec<T>(x: T) -> alloc::vec::Vec<u8>
+pub fn to_vec<T>(x: &T) -> alloc::vec::Vec<u8>
 where
     T: Encode,
 {
