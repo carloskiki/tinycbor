@@ -393,14 +393,14 @@ impl Data {
                 let ty = variant_ty(&fields[0]);
                 return quote! {
                     #[derive(::core::fmt::Debug)]
-                    struct #name <#(#error_generics),*> (pub #ty);
+                    pub struct #name <#(#error_generics),*> (pub #ty);
                 };
             }
             Data::Map(map_fields) => {
                 let ty = variant_ty(&map_fields[0].field);
                 return quote! {
                     #[derive(::core::fmt::Debug)]
-                    struct #name <#(#error_generics),*> (pub #ty);
+                    pub struct #name <#(#error_generics),*> (pub #ty);
                 };
             }
             Data::Enum(variants) => variants
@@ -427,14 +427,14 @@ impl Data {
             Data::Tag(_) => {
                 return quote! {
                     #[derive(::core::fmt::Debug)]
-                    struct #name(pub ::tinycbor::tag::Error<::core::convert::Infallible>);
+                    pub struct #name(pub ::tinycbor::tag::Error<::core::convert::Infallible>);
                 };
             }
         };
 
         quote! {
             #[derive(::core::fmt::Debug)]
-            enum #name <#(#error_generics),*> { #variants }
+            pub enum #name <#(#error_generics),*> { #variants }
         }
     }
 
