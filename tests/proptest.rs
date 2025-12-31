@@ -19,7 +19,7 @@ use tinycbor::{
 use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
-#[cbor(tag_only, error = "TagOnlyError")]
+#[cbor(tag_only, error = "TagOnlyError", tag(45))]
 enum TagOnly {
     #[n(0)]
     First,
@@ -31,7 +31,7 @@ enum TagOnly {
     Fourth,
     #[n(100)]
     Fifth,
-    #[n(1025)]
+    #[cbor(n(1025))]
     Sixth,
     #[n(200000)]
     Seventh,
@@ -42,7 +42,7 @@ enum TagOnly {
 }
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
-#[cbor(error = "PartAError")]
+#[cbor(error = "PartAError", tag(1001))]
 struct PartA {
     #[proptest(value = "Null")]
     a: Null,
@@ -76,7 +76,7 @@ struct PartB {
 struct PartC {
     #[n(10101010)]
     a: Box<PartA>,
-    #[n(20202020)]
+    #[cbor(n(20202020), tag(202))]
     b: RefCell<NonZeroUsize>,
     #[n(30303030)]
     c: Cell<u64>,

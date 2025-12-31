@@ -66,11 +66,9 @@ impl Container {
         let mut procedure = data.decode();
         if let Some(tag) = tag {
             procedure = quote! {
-                match <::tinycbor::tag::Tagged<__Empty, #tag> as ::tinycbor::Decode<'__bytes>>::decode(d) {
-                    Ok(_) => {},
-                    Err(::tinycbor::tag::Error::InvalidTag) => return Err(::tinycbor::tag::Error::InvalidTag),
-                    Err(::tinycbor::tag::Error::Malformed(e)) => return Err(::tinycbor::tag::Error::Malformed(e)),
-                }
+                <::tinycbor::tag::Tagged<__Empty, #tag> as ::tinycbor::Decode<'__bytes>>::decode(d).map_err(|e| {
+                    e.map(|e| match e {})
+                })?;
                 (|| { #procedure })().map_err(|e| {
                     ::tinycbor::tag::Error::Inner(e)
                 })
@@ -142,7 +140,6 @@ impl Container {
         let tag = tag.map(|tag| {
             quote! {
                 ::tinycbor::Encode::encode(&::tinycbor::tag::Tagged::<__Empty, #tag>(__Empty), e)?;
-                #procedure
             }
         });
 

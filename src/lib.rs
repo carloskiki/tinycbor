@@ -1105,11 +1105,7 @@ impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let tag::Tagged(bytes) = tag::Tagged::<&'b [u8], { tag::IanaTag::Cbor as u64 }>::decode(d)
-            .map_err(|e| match e {
-                tag::Error::InvalidTag => tag::Error::InvalidTag,
-                tag::Error::Inner(e) => tag::Error::Inner(collections::Error::Malformed(e)),
-                tag::Error::Malformed(e) => tag::Error::Malformed(e),
-            })?;
+            .map_err(|e| e.map(collections::Error::Malformed))?;
 
         let mut inner_decoder = Decoder(bytes);
         T::decode(&mut inner_decoder)
