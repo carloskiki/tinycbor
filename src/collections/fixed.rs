@@ -14,6 +14,17 @@ pub enum Error<E> {
     Collection(super::Error<E>),
 }
 
+impl<E> Error<E> {
+    /// Map a function on the inner error.
+    pub fn map<O>(self, f: impl FnOnce(E) -> O) -> Error<O> {
+        match self {
+            Error::Missing => Error::Missing,
+            Error::Surplus => Error::Surplus,
+            Error::Collection(e) => Error::Collection(e.map(f)),
+        }
+    }
+}
+
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

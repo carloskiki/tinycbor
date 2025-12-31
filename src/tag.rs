@@ -16,6 +16,17 @@ pub enum Error<E> {
     Inner(E),
 }
 
+impl<E> Error<E> {
+    /// Map a function on the inner error.
+    pub fn map<O>(self, f: impl FnOnce(E) -> O) -> Error<O> {
+        match self {
+            Error::Malformed(e) => Error::Malformed(e),
+            Error::InvalidTag => Error::InvalidTag,
+            Error::Inner(e) => Error::Inner(f(e)),
+        }
+    }
+}
+
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

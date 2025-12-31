@@ -13,6 +13,16 @@ pub enum Error<K, V> {
     Value(V),
 }
 
+impl<K, V> Error<K, V> {
+    /// Map a function on the key and value errors.
+    pub fn map<KO, VO>(self, fk: impl FnOnce(K) -> KO, fv: impl FnOnce(V) -> VO) -> Error<KO, VO> {
+        match self {
+            Error::Key(e) => Error::Key(fk(e)),
+            Error::Value(e) => Error::Value(fv(e)),
+        }
+    }
+}
+
 impl<K: core::fmt::Display, V: core::fmt::Display> core::fmt::Display for Error<K, V> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
