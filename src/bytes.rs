@@ -83,15 +83,25 @@ impl<const N: usize> Decode<'_> for [u8; N] {
     type Error = fixed::Error<core::convert::Infallible>;
 
     fn decode(d: &mut Decoder<'_>) -> Result<Self, Self::Error> {
+        <&[u8; N] as Decode>::decode(d).copied()
+    }
+}
+
+impl<'a, 'b, const N: usize> Decode<'b> for &'a [u8; N]
+where
+    'b: 'a,
+{
+    type Error = fixed::Error<core::convert::Infallible>;
+
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let slice: &[u8] = Decode::decode(d).map_err(collections::Error::Malformed)?;
-        if slice.len() < N {
-            return Err(fixed::Error::Missing);
-        } else if slice.len() > N {
-            return Err(fixed::Error::Surplus);
-        }
-        let mut array = [0u8; N];
-        array.copy_from_slice(slice);
-        Ok(array)
+        slice.try_into().map_err(|_| {
+            if slice.len() < N {
+                fixed::Error::Missing
+            } else {
+                fixed::Error::Surplus
+            }
+        })
     }
 }
 
