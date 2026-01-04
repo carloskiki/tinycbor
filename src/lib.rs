@@ -1182,10 +1182,13 @@ where
                 Token::BeginString => stack.push(Frame::IndefString),
                 Token::BeginArray => stack.push(Frame::IndefArray),
                 Token::BeginMap => stack.push(Frame::IndefMap),
+                
                 Token::Break if !matches!(top(&stack), Frame::Count(_)) => {
                     stack.pop();
                 }
                 Token::Break => return Err(invalid_header()),
+                
+                Token::Tag(_) => continue,
 
                 _ => {}
             }
@@ -1251,9 +1254,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::num::NonZeroU8;
-
-    use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined};
+    use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined, tag::Tagged};
 
     #[test]
     fn any() {
@@ -1261,7 +1262,7 @@ mod tests {
 
         encoder.map(3);
         u32::MAX.encode(&mut encoder);
-        "hello world".encode(&mut encoder);
+        Tagged::<_, 33>("hello world").encode(&mut encoder);
         encoder.array(2);
         true.encode(&mut encoder);
         core::f64::consts::PI.encode(&mut encoder);
@@ -1278,6 +1279,11 @@ mod tests {
         encoder.begin_bytes();
         encoder.end();
 
-        Any::decode(&mut Decoder(&encoder.0)).unwrap();
+        let any = Any::decode(&mut Decoder(&encoder.0)).unwrap();
+        assert_eq!(any.as_ref(), encoder.0.as_slice());
+
+        let mut encoded = Vec::new();
+        any.encode(&mut Encoder(&mut encoded)).unwrap();
+        assert_eq!(encoded, encoder.0);
     }
 }
