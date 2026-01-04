@@ -1138,10 +1138,13 @@ impl<'a> core::convert::AsRef<[u8]> for Any<'a> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a> Decode<'a> for Any<'a> {
+impl<'a, 'b> Decode<'b> for Any<'a>
+where
+    'b: 'a,
+{
     type Error = string::Error;
 
-    fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         use alloc::{vec, vec::Vec};
 
         enum Frame {
