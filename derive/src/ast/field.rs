@@ -160,8 +160,6 @@ impl Field {
         }
     }
 
-    // Returns the extension to be suffixed after the call to
-    // decode: `<#type as Decode<'_>>::decode(d)#extension`
     pub fn decode(&self) -> TokenStream {
         let mut extension = TokenStream::new();
         if self.tag.is_some() {
@@ -319,7 +317,7 @@ impl MapField {
         let unwrap = if self.optional {
             quote! { .unwrap_or_default() }
         } else {
-            quote! { .ok_or(::tinycbor::collections::fixed::Error::Missing)? }
+            quote! { .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))? }
         };
 
         let constructor = quote! {

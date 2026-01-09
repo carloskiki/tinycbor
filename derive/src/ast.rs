@@ -449,8 +449,7 @@ impl Data {
                         }
                     })
                     .collect::<Vec<_>>();
-                let output =
-                    quote! { ::tinycbor::collections::fixed::Error<__Error<#(#generic_tys),*>> };
+                let output = quote! { ::tinycbor::collections::Error<::tinycbor::collections::fixed::Error<__Error<#(#generic_tys),*>>> };
                 output
             }
             Data::Map(fields) => {
@@ -463,9 +462,11 @@ impl Data {
                     }
                 });
                 quote! {
-                    ::tinycbor::collections::fixed::Error<
-                        ::tinycbor::collections::map::Error<
-                            ::tinycbor::primitive::Error, __Error<#(#generic_tys),*>
+                    ::tinycbor::collections::Error<
+                        ::tinycbor::collections::fixed::Error<
+                            ::tinycbor::collections::map::Error<
+                                ::tinycbor::primitive::Error, __Error<#(#generic_tys),*>
+                            >
                         >
                     >
                 }
@@ -483,8 +484,10 @@ impl Data {
                 });
 
                 quote! {
-                    ::tinycbor::collections::fixed::Error<
-                        ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
+                    ::tinycbor::collections::Error<
+                        ::tinycbor::collections::fixed::Error<
+                            ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
+                        >
                     >
                 }
             }
@@ -609,21 +612,21 @@ impl Data {
 
                     quote::quote_spanned! {ty_span=>
                         #member: visitor.visit::<#ty>()
-                        .ok_or(::tinycbor::collections::fixed::Error::Missing)?
-                        .map_err(|e| ::tinycbor::collections::fixed::Error::Collection(
-                            ::tinycbor::collections::Error::Element(#error_constructor(e))
+                        .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
+                        .map_err(|e| ::tinycbor::collections::Error::Element(
+                            ::tinycbor::collections::fixed::Error::Inner(#error_constructor(e))
                         ))?#extension
                     }
                 });
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
+                        ::tinycbor::collections::Error::Malformed(e)
                     })?;
                     let result = Self {
                         #(#fields),*
                     };
                     if visitor.remaining() != Some(0) {
-                        Err(::tinycbor::collections::fixed::Error::Surplus)?;
+                        Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus))?;
                     }
                     Ok(result)
                 }
@@ -644,12 +647,12 @@ impl Data {
                     #(#variable_defs)*
 
                     let mut visitor = d.map_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
+                        ::tinycbor::collections::Error::Malformed(e)
                     })?;
                     loop {
                         if #(#variables.is_some() &&)* true {
                             if visitor.remaining() != Some(0) {
-                                return Err(::tinycbor::collections::fixed::Error::Surplus);
+                                return Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus));
                             }
                             break;
                         }
@@ -666,23 +669,25 @@ impl Data {
                         };
                         match result {
                             ::core::result::Result::Ok(::core::result::Result::Err(value_err)) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::fixed::Error::Collection(
-                                ::tinycbor::collections::Error::Element(
-                                    ::tinycbor::collections::map::Error::Value(
-                                        value_err
+                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(
+                                    ::tinycbor::collections::fixed::Error::Inner(
+                                        ::tinycbor::collections::map::Error::Value(
+                                            value_err
+                                        )
                                     )
                                 )
-                            )),
+                            ),
                             ::core::result::Result::Err(key_err) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::fixed::Error::Collection(
-                                ::tinycbor::collections::Error::Element(
-                                    ::tinycbor::collections::map::Error::Key(
-                                        key_err
+                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(
+                                    ::tinycbor::collections::fixed::Error::Inner(
+                                        ::tinycbor::collections::map::Error::Key(
+                                            key_err
+                                        )
                                     )
                                 )
-                            )),
+                            ),
                             ::core::result::Result::Ok(::core::result::Result::Ok(false)) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::fixed::Error::Surplus),
+                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus)),
                             _ => {}
                         }
                     }
@@ -697,28 +702,30 @@ impl Data {
 
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::fixed::Error::Collection(::tinycbor::collections::Error::Malformed(e))
+                        ::tinycbor::collections::Error::Malformed(e)
                     })?;
                     let tag = visitor
                         .visit::<u64>()
-                        .ok_or(::tinycbor::collections::fixed::Error::Missing)?
-                        .map_err(|e| ::tinycbor::collections::fixed::Error::Collection(
+                        .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
+                        .map_err(|e|
                             ::tinycbor::collections::Error::Element(
-                                ::tinycbor::tag::Error::Malformed(e)
+                                ::tinycbor::collections::fixed::Error::Inner(
+                                    ::tinycbor::tag::Error::Malformed(e)
+                                )
                             )
-                        ))?;
+                        )?;
 
                     let result = match tag {
                         #(#arms)*
                         _ => {
-                            return Err(::tinycbor::collections::fixed::Error::Collection(
-                                ::tinycbor::collections::Error::Element(::tinycbor::tag::Error::InvalidTag)
+                            return Err(::tinycbor::collections::Error::Element(
+                                ::tinycbor::collections::fixed::Error::Inner(::tinycbor::tag::Error::InvalidTag)
                             ));
                         }
                     };
 
                     if visitor.remaining() != Some(0) {
-                        Err(::tinycbor::collections::fixed::Error::Surplus)?;
+                        Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus))?;
                     }
                     Ok(result)
                 }

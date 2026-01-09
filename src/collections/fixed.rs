@@ -3,15 +3,15 @@ use core::mem::MaybeUninit;
 
 use crate::{CborLen, Decode, Decoder, Encode};
 
-/// An error that can occur when decoding fixed length structures and collections.
+/// An error that can occur when decoding fixed length structures or collections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<E> {
     /// Not enough elements.
     Missing,
     /// Unexpected surplus elements.
     Surplus,
-    /// Either the header or an element caused an error.
-    Collection(super::Error<E>),
+    /// An error occurred while decoding the underlying element.
+    Inner(E),
 }
 
 impl<E> Error<E> {
@@ -20,7 +20,7 @@ impl<E> Error<E> {
         match self {
             Error::Missing => Error::Missing,
             Error::Surplus => Error::Surplus,
-            Error::Collection(e) => Error::Collection(e.map(f)),
+            Error::Inner(e) => Error::Inner(f(e)),
         }
     }
 }
@@ -30,14 +30,8 @@ impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
         match self {
             Error::Missing => write!(f, "missing elements"),
             Error::Surplus => write!(f, "too many elements"),
-            Error::Collection(e) => write!(f, "{e}"),
+            Error::Inner(e) => write!(f, "{e}"),
         }
-    }
-}
-
-impl<E> From<super::Error<E>> for Error<E> {
-    fn from(e: super::Error<E>) -> Self {
-        Error::Collection(e)
     }
 }
 
@@ -46,7 +40,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
         match self {
             Error::Missing => None,
             Error::Surplus => None,
-            Error::Collection(e) => Some(e),
+            Error::Inner(e) => Some(e),
         }
     }
 }
@@ -85,7 +79,7 @@ impl<'a, T, const N: usize> Decode<'a> for [T; N]
 where
     T: Decode<'a>,
 {
-    type Error = Error<T::Error>;
+    type Error = super::Error<Error<T::Error>>;
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         let mut visitor = d.array_visitor().map_err(super::Error::Malformed)?;
@@ -98,8 +92,8 @@ where
             elem.write(
                 visitor
                     .visit::<T>()
-                    .ok_or(Error::Missing)?
-                    .map_err(super::Error::Element)?,
+                    .ok_or(super::Error::Element(Error::Missing))?
+                    .map_err(|e| super::Error::Element(Error::Inner(e)))?,
             );
             guard.initialized += 1;
         }
@@ -107,7 +101,7 @@ where
         let array = unsafe { guard.assume_init() };
 
         if visitor.remaining() != Some(0) {
-            return Err(Error::Surplus);
+            return Err(super::Error::Element(Error::Surplus));
         }
 
         Ok(array)
@@ -137,10 +131,10 @@ where
     K: Decode<'a>,
     V: Decode<'a>,
 {
-    type Error = Error<super::map::Error<K::Error, V::Error>>;
+    type Error = super::Error<Error<super::map::Error<K::Error, V::Error>>>;
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
-        let mut visitor = d.map_visitor().map_err(super::Error::Malformed)?;
+        let mut visitor = d.map_visitor()?;
         let mut guard = Guard {
             data: [const { MaybeUninit::uninit() }; N],
             initialized: 0,
@@ -149,8 +143,8 @@ where
         for elem in &mut guard.data {
             let v = visitor
                 .visit()
-                .ok_or(Error::Missing)?
-                .map_err(super::Error::Element)?;
+                .ok_or(super::Error::Element(Error::Missing))?
+                .map_err(|e| super::Error::Element(Error::Inner(e)))?;
             elem.write(v);
             guard.initialized += 1;
         }
@@ -158,7 +152,7 @@ where
         let array = unsafe { guard.assume_init() };
 
         if visitor.remaining() != Some(0) {
-            return Err(Error::Surplus);
+            return Err(super::Error::Element(Error::Surplus));
         }
         Ok(array)
     }
@@ -187,7 +181,7 @@ impl<K: CborLen, V: CborLen, const N: usize> CborLen for [(K, V); N] {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Decode, Decoder, test};
+    use crate::{Decode, Decoder, collections, test};
 
     const EMPTY_ARRAY: &[u8] = &[0x80];
 
@@ -236,7 +230,10 @@ mod tests {
         use super::Error;
         let cbor = &[0x82, 0x01, 0x02];
         let result = <[u16; 3]>::decode(&mut Decoder(cbor));
-        assert!(matches!(result, Err(Error::Missing)));
+        assert!(matches!(
+            result,
+            Err(collections::Error::Element(Error::Missing))
+        ));
     }
 
     #[test]
@@ -244,7 +241,10 @@ mod tests {
         use super::Error;
         let cbor = &[0x83, 0x01, 0x02, 0x03];
         let result = <[u16; 2]>::decode(&mut Decoder(cbor));
-        assert!(matches!(result, Err(Error::Surplus)));
+        assert!(matches!(
+            result,
+            Err(collections::Error::Element(Error::Surplus))
+        ));
     }
 
     #[test]

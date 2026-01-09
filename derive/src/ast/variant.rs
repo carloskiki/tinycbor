@@ -120,9 +120,9 @@ impl Variant {
 
             quote::quote_spanned! {ty_span=>
                 #member: visitor.visit::<#ty>()
-                .ok_or(::tinycbor::collections::fixed::Error::Missing)?
-                .map_err(|e| ::tinycbor::collections::fixed::Error::Collection(
-                    ::tinycbor::collections::Error::Element(
+                .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
+                .map_err(|e| ::tinycbor::collections::Error::Element(
+                    ::tinycbor::collections::fixed::Error::Inner(
                         ::tinycbor::tag::Error::Inner(
                             #error_constructor(e)
                         )

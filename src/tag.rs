@@ -30,9 +30,9 @@ impl<E> Error<E> {
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Malformed(e) => write!(f, "{}", e),
+            Error::Malformed(e) => write!(f, "malformed tag: {}", e),
             Error::InvalidTag => write!(f, "invalid tag"),
-            Error::Inner(e) => write!(f, "in tagged value: {}", e),
+            Error::Inner(e) => write!(f, "{}", e),
         }
     }
 }
