@@ -19,7 +19,7 @@ use tinycbor::{
 use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
-#[cbor(tag_only, error = "TagOnlyError", tag(45))]
+#[cbor(naked, error = "TagOnlyError", tag(45))]
 enum TagOnly {
     #[n(0)]
     First,

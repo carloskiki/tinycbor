@@ -160,7 +160,7 @@ impl Field {
         }
     }
 
-    pub fn decode(&self) -> TokenStream {
+    pub fn decode_extension(&self) -> TokenStream {
         let mut extension = TokenStream::new();
         if self.tag.is_some() {
             extension.extend(quote! { .0 });
@@ -171,6 +171,29 @@ impl Field {
         }
 
         extension
+    }
+
+    pub fn decode(self, error_constructor: &TokenStream, naked: bool) -> TokenStream {
+        let member = self.member.clone();
+
+        let ty = self.decode_ty();
+        let extension = self.decode_extension();
+        let ty_span = ty.span();
+        let decode_call = if naked {
+            quote! { ::tinycbor::Decode::decode(d).map_err(|e| #error_constructor) }
+        } else {
+            quote! { 
+                visitor.visit::<#ty>()
+                .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
+                .map_err(|e| ::tinycbor::collections::Error::Element(
+                    ::tinycbor::collections::fixed::Error::Inner(#error_constructor)
+                ))
+            }
+        };
+
+        quote::quote_spanned! {ty_span=>
+            #member: #decode_call?#extension
+        }
     }
 
     pub fn variable(&self) -> syn::Ident {
@@ -290,7 +313,7 @@ impl MapField {
         let index = self.index;
         let error_name = self.field.error_name();
         let ty = self.field.decode_ty();
-        let extension = self.field.decode();
+        let extension = self.field.decode_extension();
         let ty_span = ty.span();
         let error_constructor = if single {
             quote! { __Error }
