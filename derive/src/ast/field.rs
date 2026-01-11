@@ -180,7 +180,7 @@ impl Field {
         let extension = self.decode_extension();
         let ty_span = ty.span();
         let decode_call = if naked {
-            quote! { ::tinycbor::Decode::decode(d).map_err(|e| #error_constructor) }
+            quote! { <#ty as ::tinycbor::Decode<'__bytes>>::decode(d).map_err(|e| #error_constructor) }
         } else {
             quote! {
                 visitor.visit::<#ty>()
