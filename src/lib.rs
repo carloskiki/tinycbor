@@ -1182,12 +1182,12 @@ where
                 Token::BeginString => stack.push(Frame::IndefString),
                 Token::BeginArray => stack.push(Frame::IndefArray),
                 Token::BeginMap => stack.push(Frame::IndefMap),
-                
+
                 Token::Break if !matches!(top(&stack), Frame::Count(_)) => {
                     stack.pop();
                 }
                 Token::Break => return Err(invalid_header()),
-                
+
                 Token::Tag(_) => continue,
 
                 _ => {}

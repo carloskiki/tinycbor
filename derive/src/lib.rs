@@ -13,7 +13,7 @@
 //! Deriving `Encode`, `Decode` and `CborLen` is supported for `enum`s and `struct`s. This section
 //! goes over the representation of these containers, as well as how the attributes modify the
 //! behaviour of the macros.
-//! 
+//!
 //! ## Array representation for `struct`s
 //!
 //! A `struct` is encoded as a CBOR array by default. The fields are encoded in their order
@@ -50,7 +50,7 @@
 //! ```
 //!
 //! ## Map representation for `struct`s
-//! 
+//!
 //! A `struct` can alternatively be encoded as a map by adding `#[cbor(map)]` on the container. The
 //! fields are encoded as values within a map, with unsigned integers as keys. The `Decode`
 //! implementation allows for both definite and indefinite length maps. All fields must be present
@@ -59,7 +59,7 @@
 //!
 //! The key for each field is specified using the `#[n(<u64>)]` or `#[cbor(n(<u64>))]` attribute on
 //! the field.
-//! 
+//!
 //! ```
 //! use tinycbor_derive::{Encode, Decode};
 //! use tinycbor::{to_vec, Decoder, Token};
@@ -261,7 +261,7 @@
 //!
 //! ```no_run
 //! use tinycbor_derive::{Encode, Decode, CborLen};
-//! 
+//!
 //! #[derive(Encode, Decode, CborLen)]
 //! #[cbor(naked)]
 //! enum Status {
@@ -279,7 +279,7 @@
 //! ```
 //! use tinycbor_derive::Encode;
 //! use tinycbor::{Decoder, to_vec, Token};
-//! 
+//!
 //! #[derive(Encode)]
 //! #[cbor(naked)]
 //! struct Danger {
@@ -336,7 +336,7 @@
 //!
 //! When deriving `Encode` or `CborLen` and using `#[cbor({encode_,len_,}with = "<Type>")]`,
 //! `&T` must implement `Into<&<Type>>`.
-//! 
+//!
 //! ```no_run
 //! use tinycbor_derive::{Encode, Decode, CborLen};
 //!

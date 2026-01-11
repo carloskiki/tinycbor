@@ -182,7 +182,7 @@ impl Field {
         let decode_call = if naked {
             quote! { ::tinycbor::Decode::decode(d).map_err(|e| #error_constructor) }
         } else {
-            quote! { 
+            quote! {
                 visitor.visit::<#ty>()
                 .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
                 .map_err(|e| ::tinycbor::collections::Error::Element(
