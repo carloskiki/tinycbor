@@ -1046,6 +1046,12 @@ impl<T> Encoded<T> {
     }
 }
 
+impl<T> From<Encoded<T>> for Option<T> {
+    fn from(value: Encoded<T>) -> Self {
+        Some(value.0)
+    }
+}
+
 impl<T> From<T> for Encoded<T> {
     fn from(value: T) -> Self {
         Encoded(value)

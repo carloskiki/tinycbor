@@ -87,6 +87,12 @@ impl<T, const N: u64> Tagged<T, N> {
     }
 }
 
+impl<T, const N: u64> From<Tagged<T, N>> for Option<T> {
+    fn from(val: Tagged<T, N>) -> Self {
+        Some(val.0)
+    }
+}
+
 impl<T, const N: u64> From<T> for Tagged<T, N> {
     fn from(val: T) -> Self {
         Self(val)
