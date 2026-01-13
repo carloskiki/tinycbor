@@ -85,7 +85,7 @@ impl Container {
                     ::alloc::boxed::Box::new(e)
                 })
             };
-            
+
             error_ty = quote! { ::alloc::boxed::Box<#error_ty> };
         }
 

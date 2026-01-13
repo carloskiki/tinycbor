@@ -205,7 +205,7 @@
 //! ### `#[cbor(recursive)]`
 //!
 //! This attribute is required when deriving `Decode` for a recursive type. Without it, the
-//! error type is infinitely sized, causing a compilation error. 
+//! error type is infinitely sized, causing a compilation error.
 //!
 //! ```compile_fail
 //! use tinycbor_derive::Decode;
@@ -220,7 +220,7 @@
 //! ```
 //!
 //! This solves the issue by boxing the error type, and thus requires an allocator to be available.
-//! 
+//!
 //! ```no_run
 //! # extern crate alloc;
 //! use tinycbor_derive::Decode;

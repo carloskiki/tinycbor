@@ -2,7 +2,7 @@
 extern crate alloc;
 
 use tinycbor::{Decode, Decoder, to_vec};
-use tinycbor_derive::{Encode, Decode, CborLen};
+use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Encode, Decode, CborLen, PartialEq, Eq, Debug)]
 #[cbor(recursive)]
@@ -25,7 +25,10 @@ fn roundtrip() {
     let original = Binary::Node(
         Box::new(Binary::Leaf(Thing {
             value: 1,
-            next: Some(Box::new(Thing { value: 2, next: None })),
+            next: Some(Box::new(Thing {
+                value: 2,
+                next: None,
+            })),
         })),
         Box::new(Binary::Leaf(Thing {
             value: 3,
@@ -37,5 +40,4 @@ fn roundtrip() {
     let decoded: Binary = Decode::decode(&mut Decoder(&encoded)).unwrap();
 
     assert_eq!(original, decoded);
-    
 }
