@@ -9,14 +9,14 @@ pub enum Error {
     /// The string is malformed.
     Malformed(primitive::Error),
     /// The string is not valid UTF-8.
-    Utf8(core::str::Utf8Error),
+    Utf8,
 }
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::Malformed(e) => write!(f, "{}", e),
-            Error::Utf8(e) => write!(f, "{}", e),
+            Error::Utf8 => write!(f, "invalid UTF-8 string"),
         }
     }
 }
@@ -28,8 +28,8 @@ impl From<primitive::Error> for Error {
 }
 
 impl From<core::str::Utf8Error> for Error {
-    fn from(e: core::str::Utf8Error) -> Self {
-        Error::Utf8(e)
+    fn from(_: core::str::Utf8Error) -> Self {
+        Error::Utf8
     }
 }
 
@@ -43,7 +43,7 @@ impl core::error::Error for Error {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Error::Malformed(e) => Some(e),
-            Error::Utf8(e) => Some(e),
+            Error::Utf8 => None,
         }
     }
 }
