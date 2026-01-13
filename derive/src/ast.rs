@@ -17,6 +17,7 @@ pub struct Container {
     pub bounds: Bounds,
     pub data: Data,
     pub error: syn::Ident,
+    pub recursive: bool,
     pub original: syn::DeriveInput,
 }
 
@@ -38,6 +39,7 @@ impl Container {
                     ..
                 },
             error,
+            recursive,
         } = self;
 
         let (_, ty_generics, _) = generics.split_for_impl();
@@ -76,6 +78,15 @@ impl Container {
             };
 
             error_ty = quote! { ::tinycbor::tag::Error<#error_ty> };
+        }
+        if recursive {
+            procedure = quote! {
+                (|| { #procedure })().map_err(|e| {
+                    ::alloc::boxed::Box::new(e)
+                })
+            };
+            
+            error_ty = quote! { ::alloc::boxed::Box<#error_ty> };
         }
 
         quote! {
@@ -236,6 +247,7 @@ impl TryFrom<syn::DeriveInput> for Container {
         let mut bounds = Bounds::default();
         let mut map = false;
         let mut naked = false;
+        let mut recursive = false;
         let mut error = None;
 
         for attr in &input.attrs {
@@ -251,6 +263,9 @@ impl TryFrom<syn::DeriveInput> for Container {
                     return Ok(());
                 } else if meta.path.is_ident("naked") {
                     naked = true;
+                    return Ok(());
+                } else if meta.path.is_ident("recursive") {
+                    recursive = true;
                     return Ok(());
                 } else if meta.path.is_ident("error") {
                     if error.is_some() {
@@ -333,6 +348,7 @@ impl TryFrom<syn::DeriveInput> for Container {
             data,
             original: input,
             error: error.unwrap_or_else(|| Ident::new("Error", Span::call_site())),
+            recursive,
         })
     }
 }

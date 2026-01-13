@@ -205,16 +205,32 @@
 //! ### `#[cbor(recursive)]`
 //!
 //! This attribute is required when deriving `Decode` for a recursive type. Without it, the
-//! error type is infinitely sized, causing a compilation error. This solves the issue by boxing
-//! the error type.
+//! error type is infinitely sized, causing a compilation error. 
 //!
+//! ```compile_fail
+//! use tinycbor_derive::Decode;
+//!
+//! #[derive(Decode)]
+//! enum List {
+//!     #[n(0)]
+//!     Nil,
+//!     #[n(1)]
+//!     Cons(u64, Box<List>),
+//! }
+//! ```
+//!
+//! This solves the issue by boxing the error type, and thus requires an allocator to be available.
+//! 
 //! ```no_run
+//! # extern crate alloc;
 //! use tinycbor_derive::Decode;
 //!
 //! #[derive(Decode)]
 //! #[cbor(recursive)]
 //! enum List {
+//!     #[n(0)]
 //!     Nil,
+//!     #[n(1)]
 //!     Cons(u64, Box<List>),
 //! }
 //! ```
