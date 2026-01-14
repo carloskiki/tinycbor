@@ -1,19 +1,19 @@
-//! `alloc` and `std` collection support.
+//! Containers.
 
 use crate::{CborLen, Encode, Encoder, primitive};
 #[cfg(feature = "alloc")]
 use crate::{Decode, Decoder};
 
-pub mod fixed;
+pub mod bounded;
 pub mod map;
 
-/// Error that can occur when decoding dynamic containers.
+/// Possible errors when decoding containers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<E> {
-    /// The container header is malformed.
+    /// Container header is malformed.
     Malformed(primitive::Error),
-    /// While decoding an element within the container.
-    Element(E),
+    /// Error decoding the content.
+    Content(E),
 }
 
 impl<E> Error<E> {
@@ -21,7 +21,7 @@ impl<E> Error<E> {
     pub fn map<O>(self, f: impl FnOnce(E) -> O) -> Error<O> {
         match self {
             Error::Malformed(e) => Error::Malformed(e),
-            Error::Element(e) => Error::Element(f(e)),
+            Error::Content(e) => Error::Content(f(e)),
         }
     }
 }
@@ -29,8 +29,8 @@ impl<E> Error<E> {
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Malformed(e) => write!(f, "{e}"),
-            Error::Element(e) => write!(f, "container element: {e}"),
+            Error::Malformed(_) => write!(f, "container header is malformed"),
+            Error::Content(_) => write!(f, "container payload error"),
         }
     }
 }
@@ -42,8 +42,14 @@ impl<E> From<primitive::Error> for Error<E> {
 }
 
 impl<E> From<crate::EndOfInput> for Error<E> {
-    fn from(e: crate::EndOfInput) -> Self {
-        Error::Malformed(primitive::Error::EndOfInput(e))
+    fn from(_: crate::EndOfInput) -> Self {
+        Error::Malformed(primitive::Error::EndOfInput)
+    }
+}
+
+impl<E> From<crate::InvalidHeader> for Error<E> {
+    fn from(_: crate::InvalidHeader) -> Self {
+        Error::Malformed(primitive::Error::InvalidHeader)
     }
 }
 
@@ -51,7 +57,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Error::Malformed(e) => Some(e),
-            Error::Element(e) => Some(e),
+            Error::Content(e) => Some(e),
         }
     }
 }
@@ -67,7 +73,7 @@ where
         let mut visitor = d.array_visitor()?;
         let mut v = Self::new();
         while let Some(elem) = visitor.visit() {
-            v.push(elem.map_err(Error::Element)?);
+            v.push(elem.map_err(Error::Content)?);
         }
 
         Ok(v)
@@ -86,7 +92,7 @@ where
         let mut visitor = d.array_visitor()?;
         let mut v = Self::default();
         while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(Error::Element)?);
+            v.insert(elem.map_err(Error::Content)?);
         }
 
         Ok(v)
@@ -104,7 +110,7 @@ where
         let mut visitor = d.array_visitor()?;
         let mut v = Self::new();
         while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(Error::Element)?);
+            v.insert(elem.map_err(Error::Content)?);
         }
         Ok(v)
     }
@@ -121,7 +127,7 @@ macro_rules! decode_sequential {
                     let mut visitor = d.array_visitor()?;
                     let mut v = Self::new();
                     while let Some(x) = visitor.visit() {
-                        v.$push(x.map_err(Error::Element)?)
+                        v.$push(x.map_err(Error::Content)?)
                     }
                     Ok(v)
                 }

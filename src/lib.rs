@@ -41,7 +41,7 @@
 #![doc = include_str!("../DESIGN.md")]
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 
-// To support targets with 128 bit pointers, we would need to handle collections having lengths
+// To support targets with 128 bit pointers, we would need to handle containers having lengths
 // larger than supported by the CBOR format. We don't want to deal with that right now.
 #[cfg(not(any(
     target_pointer_width = "16",
@@ -56,7 +56,7 @@ extern crate alloc;
 pub use embedded_io::Write;
 
 mod bytes;
-pub mod collections;
+pub mod container;
 pub mod num;
 pub mod primitive;
 pub mod string;
@@ -86,7 +86,7 @@ where
     buf
 }
 
-/// Error indicating that the end of input has been reached.
+/// Unexpected end of input.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct EndOfInput;
 
@@ -98,7 +98,7 @@ impl core::fmt::Display for EndOfInput {
 
 impl core::error::Error for EndOfInput {}
 
-/// Error indicating that the CBOR header (first byte) is invalid or malformed.
+/// The CBOR header (first byte) is invalid or malformed.
 ///
 /// This can happen if the header byte represents a different type than expected, or if the header
 /// byte is malformed (e.g., uses a reserved value from the CBOR specification).
@@ -201,9 +201,9 @@ impl<'b> Decoder<'b> {
     /// Returns an iterator the potentially many (if indefinite) byte slices that make up the
     /// bytestring.
     pub fn bytes_iter(&mut self) -> Result<BytesIter<'_, 'b>, primitive::Error> {
-        let b = self.peek().map_err(primitive::Error::EndOfInput)?;
+        let b = self.peek()?;
         if BYTES != type_of(b) {
-            return Err(primitive::Error::InvalidHeader(InvalidHeader));
+            return Err(primitive::Error::InvalidHeader);
         }
         let state = if info_of(b) == 31 {
             self.read().expect("was peeked");
@@ -229,9 +229,9 @@ impl<'b> Decoder<'b> {
     /// Returns an iterator the potentially many (if indefinite) string slices that make up the
     /// UTF-8 string.
     pub fn str_iter(&mut self) -> Result<StrIter<'_, 'b>, primitive::Error> {
-        let b = self.peek().map_err(primitive::Error::EndOfInput)?;
+        let b = self.peek()?;
         if TEXT != type_of(b) {
-            return Err(primitive::Error::InvalidHeader(InvalidHeader));
+            return Err(primitive::Error::InvalidHeader);
         }
         let state = if info_of(b) == 31 {
             self.read().expect("was peeked");
@@ -259,7 +259,7 @@ impl<'b> Decoder<'b> {
     pub fn array_visitor(&mut self) -> Result<ArrayVisitor<'_, 'b>, primitive::Error> {
         let b = self.peek()?;
         if ARRAY != type_of(b) {
-            return Err(primitive::Error::InvalidHeader(InvalidHeader));
+            return Err(primitive::Error::InvalidHeader);
         }
         let state = if info_of(b) == 31 {
             self.read().expect("was peeked");
@@ -284,9 +284,9 @@ impl<'b> Decoder<'b> {
     /// The [`MapVisitor`] allows iterating over the key-value pairs of different types with the
     /// [`MapVisitor::visit`] method.
     pub fn map_visitor(&mut self) -> Result<MapVisitor<'_, 'b>, primitive::Error> {
-        let b = self.peek().map_err(primitive::Error::from)?;
+        let b = self.peek()?;
         if MAP != type_of(b) {
-            return Err(primitive::Error::InvalidHeader(InvalidHeader));
+            return Err(primitive::Error::InvalidHeader);
         }
         let state = if info_of(b) == 31 {
             self.read().expect("was peeked");
@@ -336,7 +336,7 @@ impl<'b> Decoder<'b> {
             0x19 => self.read_array().map(u16::from_be_bytes).map(u64::from),
             0x1a => self.read_array().map(u32::from_be_bytes).map(u64::from),
             0x1b => self.read_array().map(u64::from_be_bytes),
-            _ => return Err(primitive::Error::InvalidHeader(InvalidHeader)),
+            _ => return Err(primitive::Error::InvalidHeader),
         }?)
     }
 
@@ -800,11 +800,11 @@ impl<'b> MapVisitor<'_, 'b> {
     #[allow(clippy::type_complexity)]
     pub fn visit<K: Decode<'b>, V: Decode<'b>>(
         &mut self,
-    ) -> Option<Result<(K, V), collections::map::Error<K::Error, V::Error>>> {
+    ) -> Option<Result<(K, V), container::map::Error<K::Error, V::Error>>> {
         Some(match self.with_key(|k, d| (k, V::decode(d)))? {
             Ok((k, Ok(v))) => Ok((k, v)),
-            Ok((_, Err(v))) => Err(collections::map::Error::Value(v)),
-            Err(k) => Err(collections::map::Error::Key(k)),
+            Ok((_, Err(v))) => Err(container::map::Error::Value(v)),
+            Err(k) => Err(container::map::Error::Key(k)),
         })
     }
 
@@ -985,7 +985,7 @@ impl<'b> Decode<'b> for Token<'b> {
     type Error = string::Error;
 
     fn decode(d: &mut crate::Decoder<'b>) -> Result<Self, Self::Error> {
-        Ok(match d.datatype().map_err(primitive::Error::EndOfInput)? {
+        Ok(match d.datatype()? {
             Type::Bool => Token::Bool(bool::decode(d)?),
             Type::Int => Token::Int(num::Int::decode(d)?),
             Type::Float => Token::Float(f64::decode(d)?),
@@ -1024,9 +1024,7 @@ impl<'b> Decode<'b> for Token<'b> {
                 Token::Break
             }
             Type::Unknown => {
-                return Err(string::Error::Malformed(primitive::Error::InvalidHeader(
-                    InvalidHeader,
-                )));
+                return Err(InvalidHeader.into());
             }
         })
     }
@@ -1107,16 +1105,16 @@ impl<T: ?Sized + Encode + CborLen> Encode for Encoded<T> {
 }
 
 impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
-    type Error = tag::Error<collections::Error<T::Error>>;
+    type Error = tag::Error<container::Error<T::Error>>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let tag::Tagged(bytes) = tag::Tagged::<&'b [u8], { tag::IanaTag::Cbor as u64 }>::decode(d)
-            .map_err(|e| e.map(collections::Error::Malformed))?;
+            .map_err(|e| e.map(container::Error::Malformed))?;
 
         let mut inner_decoder = Decoder(bytes);
         T::decode(&mut inner_decoder)
             .map(Encoded)
-            .map_err(|e| tag::Error::Inner(collections::Error::Element(e)))
+            .map_err(|e| tag::Error::Inner(container::Error::Content(e)))
     }
 }
 
@@ -1164,7 +1162,7 @@ where
             stack.last().expect("stack is non-empty")
         }
         fn invalid_header() -> string::Error {
-            string::Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader))
+            InvalidHeader.into()
         }
 
         let mut stack: Vec<Frame> = vec![Frame::Count(0)];

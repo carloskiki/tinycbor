@@ -1,16 +1,16 @@
-//! Fixed length collections and structures.
+//! size-bounded containers.
 use core::mem::MaybeUninit;
 
 use crate::{CborLen, Decode, Decoder, Encode};
 
-/// An error that can occur when decoding fixed length structures or collections.
+/// Possible errors when decoding size-bounded containers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<E> {
-    /// Not enough elements.
+    /// Not enough content.
     Missing,
-    /// Unexpected surplus elements.
+    /// Unexpected surplus content.
     Surplus,
-    /// An error occurred while decoding the underlying element.
+    /// Error decoding the content.
     Inner(E),
 }
 
@@ -28,9 +28,9 @@ impl<E> Error<E> {
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Missing => write!(f, "missing elements"),
-            Error::Surplus => write!(f, "too many elements"),
-            Error::Inner(e) => write!(f, "{e}"),
+            Error::Missing => write!(f, "missing content"),
+            Error::Surplus => write!(f, "too much content"),
+            Error::Inner(_) => write!(f, "bounded content error"),
         }
     }
 }
@@ -92,8 +92,8 @@ where
             elem.write(
                 visitor
                     .visit::<T>()
-                    .ok_or(super::Error::Element(Error::Missing))?
-                    .map_err(|e| super::Error::Element(Error::Inner(e)))?,
+                    .ok_or(super::Error::Content(Error::Missing))?
+                    .map_err(|e| super::Error::Content(Error::Inner(e)))?,
             );
             guard.initialized += 1;
         }
@@ -101,7 +101,7 @@ where
         let array = unsafe { guard.assume_init() };
 
         if visitor.remaining() != Some(0) {
-            return Err(super::Error::Element(Error::Surplus));
+            return Err(super::Error::Content(Error::Surplus));
         }
 
         Ok(array)
@@ -143,8 +143,8 @@ where
         for elem in &mut guard.data {
             let v = visitor
                 .visit()
-                .ok_or(super::Error::Element(Error::Missing))?
-                .map_err(|e| super::Error::Element(Error::Inner(e)))?;
+                .ok_or(super::Error::Content(Error::Missing))?
+                .map_err(|e| super::Error::Content(Error::Inner(e)))?;
             elem.write(v);
             guard.initialized += 1;
         }
@@ -152,7 +152,7 @@ where
         let array = unsafe { guard.assume_init() };
 
         if visitor.remaining() != Some(0) {
-            return Err(super::Error::Element(Error::Surplus));
+            return Err(super::Error::Content(Error::Surplus));
         }
         Ok(array)
     }
@@ -181,7 +181,7 @@ impl<K: CborLen, V: CborLen, const N: usize> CborLen for [(K, V); N] {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Decode, Decoder, collections, test};
+    use crate::{Decode, Decoder, container, test};
 
     const EMPTY_ARRAY: &[u8] = &[0x80];
 
@@ -232,7 +232,7 @@ mod tests {
         let result = <[u16; 3]>::decode(&mut Decoder(cbor));
         assert!(matches!(
             result,
-            Err(collections::Error::Element(Error::Missing))
+            Err(container::Error::Content(Error::Missing))
         ));
     }
 
@@ -243,7 +243,7 @@ mod tests {
         let result = <[u16; 2]>::decode(&mut Decoder(cbor));
         assert!(matches!(
             result,
-            Err(collections::Error::Element(Error::Surplus))
+            Err(container::Error::Content(Error::Surplus))
         ));
     }
 

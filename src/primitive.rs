@@ -3,38 +3,37 @@ use core::fmt::{Display, Formatter};
 
 use crate::{CborLen, Decode, Decoder, Encode, Encoder, EndOfInput, InvalidHeader, SIMPLE, Write};
 
-/// Errors that can occur when encoding or decoding CBOR primitive types.
+/// Possible errors when decoding CBOR primitive types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error {
-    /// The input ended unexpectedly.
-    EndOfInput(EndOfInput),
-    /// The header found did not match the expected header.
-    InvalidHeader(InvalidHeader),
+    /// Input ended unexpectedly.
+    EndOfInput,
+    /// CBOR header is invalid or malformed.
+    InvalidHeader,
 }
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::EndOfInput(e) => write!(f, "{e}"),
-            Error::InvalidHeader(e) => write!(f, "{e}"),
+            Error::EndOfInput => write!(f, "{}", EndOfInput),
+            Error::InvalidHeader => write!(f, "{}", InvalidHeader),
         }
     }
 }
 
 impl From<EndOfInput> for Error {
-    fn from(e: EndOfInput) -> Self {
-        Error::EndOfInput(e)
+    fn from(_: EndOfInput) -> Self {
+        Error::EndOfInput
     }
 }
 
-impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Error::EndOfInput(e) => Some(e),
-            Error::InvalidHeader(e) => Some(e),
-        }
+impl From<InvalidHeader> for Error {
+    fn from(_: InvalidHeader) -> Self {
+        Error::InvalidHeader
     }
 }
+
+impl core::error::Error for Error {}
 
 /// CBOR null type.
 #[derive(Clone, Copy, Default, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -52,7 +51,7 @@ impl Decode<'_> for Null {
     fn decode(d: &mut Decoder<'_>) -> Result<Self, Self::Error> {
         match d.read()? {
             0xf6 => Ok(Null),
-            _ => Err(Error::InvalidHeader(InvalidHeader)),
+            _ => Err(Error::InvalidHeader),
         }
     }
 }
@@ -85,7 +84,7 @@ impl Decode<'_> for Undefined {
     fn decode(d: &mut Decoder<'_>) -> Result<Self, Self::Error> {
         match d.read()? {
             0xf7 => Ok(Undefined),
-            _ => Err(Error::InvalidHeader(InvalidHeader)),
+            _ => Err(Error::InvalidHeader),
         }
     }
 }
@@ -133,11 +132,11 @@ impl Decode<'_> for Simple {
             0xf8 => {
                 let byte = d.read()?;
                 if byte < 0x20 {
-                    return Err(Error::InvalidHeader(InvalidHeader));
+                    return Err(Error::InvalidHeader);
                 }
                 Ok(Simple(byte))
             }
-            _ => Err(Error::InvalidHeader(InvalidHeader)),
+            _ => Err(Error::InvalidHeader),
         }
     }
 }
@@ -166,7 +165,7 @@ impl Decode<'_> for bool {
         match d.read()? {
             0xf4 => Ok(false),
             0xf5 => Ok(true),
-            _ => Err(Error::InvalidHeader(InvalidHeader)),
+            _ => Err(Error::InvalidHeader),
         }
     }
 }

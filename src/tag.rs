@@ -5,14 +5,14 @@ use embedded_io::Write;
 
 use crate::{CborLen, Decode, Encode, Encoder, InvalidHeader, TAGGED, primitive, type_of};
 
-/// Errors which can occur when decoding a tagged value.
+/// Possible errors when decoding a tagged value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error<E> {
-    /// The tagged value is malformed.
+    /// Tag is malformed.
     Malformed(primitive::Error),
-    /// The tag value does not match the expected tag.
+    /// Tag does not match the expected tag.
     InvalidTag,
-    /// An error occurred while decoding the inner value.
+    /// Error decoding the tagged value.
     Inner(E),
 }
 
@@ -30,9 +30,9 @@ impl<E> Error<E> {
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Malformed(e) => write!(f, "malformed tag: {}", e),
+            Error::Malformed(_) => write!(f, "malformed tag"),
             Error::InvalidTag => write!(f, "invalid tag"),
-            Error::Inner(e) => write!(f, "{}", e),
+            Error::Inner(_) => write!(f, "tagged value error"),
         }
     }
 }
@@ -44,8 +44,14 @@ impl<E> From<primitive::Error> for Error<E> {
 }
 
 impl<E> From<crate::EndOfInput> for Error<E> {
-    fn from(e: crate::EndOfInput) -> Self {
-        Error::Malformed(primitive::Error::EndOfInput(e))
+    fn from(_: crate::EndOfInput) -> Self {
+        Error::Malformed(primitive::Error::EndOfInput)
+    }
+}
+
+impl<E> From<crate::InvalidHeader> for Error<E> {
+    fn from(_: crate::InvalidHeader) -> Self {
+        Error::Malformed(primitive::Error::InvalidHeader)
     }
 }
 
@@ -139,13 +145,9 @@ where
     type Error = Error<T::Error>;
 
     fn decode(d: &mut crate::Decoder<'a>) -> Result<Self, Self::Error> {
-        let b = d
-            .peek()
-            .map_err(|e| Error::Malformed(primitive::Error::from(e)))?;
+        let b = d.peek()?;
         if TAGGED != type_of(b) {
-            return Err(Error::Malformed(primitive::Error::InvalidHeader(
-                InvalidHeader,
-            )));
+            return Err(InvalidHeader.into());
         }
         if d.unsigned().map_err(Error::Malformed)? != N {
             return Err(Error::InvalidTag);
@@ -329,9 +331,6 @@ mod tests {
         use crate::Decoder;
         let cbor = [0x18, 0x2a];
         let err = <Tagged<u32, 0>>::decode(&mut Decoder(&cbor)).unwrap_err();
-        assert_eq!(
-            err,
-            Error::Malformed(primitive::Error::InvalidHeader(InvalidHeader))
-        );
+        assert_eq!(err, InvalidHeader.into());
     }
 }

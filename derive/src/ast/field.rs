@@ -184,9 +184,9 @@ impl Field {
         } else {
             quote! {
                 visitor.visit::<#ty>()
-                .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
-                .map_err(|e| ::tinycbor::collections::Error::Element(
-                    ::tinycbor::collections::fixed::Error::Inner(#error_constructor)
+                .ok_or(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Missing))?
+                .map_err(|e| ::tinycbor::container::Error::Content(
+                    ::tinycbor::container::bounded::Error::Inner(#error_constructor)
                 ))
             }
         };
@@ -340,7 +340,7 @@ impl MapField {
         let unwrap = if self.optional {
             quote! { .unwrap_or_default() }
         } else {
-            quote! { .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))? }
+            quote! { .ok_or(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Missing))? }
         };
 
         let constructor = quote! {

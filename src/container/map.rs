@@ -4,12 +4,12 @@ use crate::{CborLen, Encode, Encoder};
 #[cfg(feature = "alloc")]
 use crate::{Decode, Decoder};
 
-/// Errors which can occur when decoding a map entry.
+/// Possible errors when decoding a map entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<K, V> {
-    /// While decoding the key.
+    /// Error decoding the key.
     Key(K),
-    /// While decoding the value.
+    /// Error decoding the value.
     Value(V),
 }
 
@@ -26,8 +26,8 @@ impl<K, V> Error<K, V> {
 impl<K: core::fmt::Display, V: core::fmt::Display> core::fmt::Display for Error<K, V> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Key(e) => write!(f, "key: {}", e),
-            Error::Value(e) => write!(f, "value: {}", e),
+            Error::Key(_) => write!(f, "map key error"),
+            Error::Value(_) => write!(f, "map value error"),
         }
     }
 }
@@ -58,7 +58,7 @@ where
         let mut m = Self::default();
         let mut visitor = d.map_visitor()?;
         while let Some(pair) = visitor.visit() {
-            let (k, v) = pair.map_err(super::Error::Element)?;
+            let (k, v) = pair.map_err(super::Error::Content)?;
             m.insert(k, v);
         }
         Ok(m)
@@ -77,7 +77,7 @@ where
         let mut m = Self::new();
         let mut visitor = d.map_visitor()?;
         while let Some(pair) = visitor.visit() {
-            let (k, v) = pair.map_err(super::Error::Element)?;
+            let (k, v) = pair.map_err(super::Error::Content)?;
             m.insert(k, v);
         }
         Ok(m)
@@ -132,7 +132,7 @@ where
         let mut visitor = d.map_visitor()?;
         let mut v = Self::new();
         while let Some(elem) = visitor.visit() {
-            v.push(elem.map_err(super::Error::Element)?);
+            v.push(elem.map_err(super::Error::Content)?);
         }
 
         Ok(v)
@@ -152,7 +152,7 @@ where
         let mut visitor = d.map_visitor()?;
         let mut v = Self::default();
         while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(super::Error::Element)?);
+            v.insert(elem.map_err(super::Error::Content)?);
         }
 
         Ok(v)
@@ -171,7 +171,7 @@ where
         let mut visitor = d.map_visitor()?;
         let mut v = Self::new();
         while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(super::Error::Element)?);
+            v.insert(elem.map_err(super::Error::Content)?);
         }
         Ok(v)
     }
@@ -188,7 +188,7 @@ macro_rules! decode_sequential {
                     let mut visitor = d.map_visitor()?;
                     let mut v = Self::new();
                     while let Some(x) = visitor.visit() {
-                        v.$push(x.map_err(super::Error::Element)?)
+                        v.$push(x.map_err(super::Error::Content)?)
                     }
                     Ok(v)
                 }

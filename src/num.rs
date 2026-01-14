@@ -5,19 +5,19 @@ use crate::{
 
 pub mod nonzero;
 
-/// Errors that can occur when decoding numbers.
+/// Possible errors when decoding numbers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
-    /// The encoded number is malformed.
+    /// Number is malformed.
     Malformed(primitive::Error),
-    /// The decoded number could not be represented without overflow or precision loss.
+    /// Number could not be represented without overflow or precision loss.
     Narrowing,
 }
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Malformed(e) => write!(f, "primitive error: {}", e),
+            Error::Malformed(_) => write!(f, "malformed number"),
             Error::Narrowing => write!(f, "overflow or precision loss"),
         }
     }
@@ -31,6 +31,12 @@ impl From<primitive::Error> for Error {
 
 impl From<EndOfInput> for Error {
     fn from(e: EndOfInput) -> Self {
+        Error::Malformed(primitive::Error::from(e))
+    }
+}
+
+impl From<InvalidHeader> for Error {
+    fn from(e: InvalidHeader) -> Self {
         Error::Malformed(primitive::Error::from(e))
     }
 }
@@ -163,7 +169,7 @@ impl Decode<'_> for Int {
                     0x39 => d.read_array().map(u16::from_be_bytes).map(|n| n as u64)?,
                     0x3a => d.read_array().map(u32::from_be_bytes).map(|n| n as u64)?,
                     0x3b => d.read_array().map(u64::from_be_bytes)?,
-                    _ => return Err(primitive::Error::InvalidHeader(InvalidHeader)),
+                    _ => return Err(InvalidHeader.into()),
                 },
             },
         })
@@ -324,7 +330,7 @@ impl Decode<'_> for u64 {
             0x19 => d.read_array().map(u16::from_be_bytes).map(u64::from),
             0x1a => d.read_array().map(u32::from_be_bytes).map(u64::from),
             0x1b => d.read_array().map(u64::from_be_bytes),
-            _ => return Err(primitive::Error::InvalidHeader(InvalidHeader)),
+            _ => return Err(InvalidHeader.into()),
         }?;
         Ok(value)
     }
@@ -623,9 +629,7 @@ impl Decode<'_> for f32 {
                 narrowed
             }
             _ => {
-                return Err(Error::Malformed(primitive::Error::InvalidHeader(
-                    InvalidHeader,
-                )));
+                return Err(InvalidHeader.into());
             }
         })
     }
@@ -665,7 +669,7 @@ impl Decode<'_> for f64 {
             }
             0xfa => Ok(f32::from_be_bytes(d.read_array()?).into()),
             0xfb => Ok(f64::from_be_bytes(d.read_array()?)),
-            _ => Err(primitive::Error::InvalidHeader(InvalidHeader)),
+            _ => Err(InvalidHeader.into()),
         }
     }
 }

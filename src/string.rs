@@ -3,20 +3,20 @@ use crate::{
     CborLen, Decode, Decoder, Encode, Encoder, InvalidHeader, TEXT, info_of, primitive, type_of,
 };
 
-/// Errors which can occur when decoding a UTF-8 string.
+/// Possible errors when decoding UTF-8 strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
-    /// The string is malformed.
+    /// String is malformed.
     Malformed(primitive::Error),
-    /// The string is not valid UTF-8.
+    /// String is not valid UTF-8.
     Utf8,
 }
 
 impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Malformed(e) => write!(f, "{}", e),
-            Error::Utf8 => write!(f, "invalid UTF-8 string"),
+            Error::Malformed(_) => write!(f, "malformed string"),
+            Error::Utf8 => write!(f, "invalid utf-8 string"),
         }
     }
 }
@@ -34,8 +34,14 @@ impl From<core::str::Utf8Error> for Error {
 }
 
 impl From<crate::EndOfInput> for Error {
-    fn from(e: crate::EndOfInput) -> Self {
-        Error::Malformed(primitive::Error::EndOfInput(e))
+    fn from(_: crate::EndOfInput) -> Self {
+        Error::Malformed(primitive::Error::EndOfInput)
+    }
+}
+
+impl From<crate::InvalidHeader> for Error {
+    fn from(_: crate::InvalidHeader) -> Self {
+        Error::Malformed(primitive::Error::InvalidHeader)
     }
 }
 
@@ -61,9 +67,7 @@ where
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let b = d.peek().map_err(primitive::Error::from)?;
         if TEXT != type_of(b) || info_of(b) == 31 {
-            return Err(Error::Malformed(primitive::Error::InvalidHeader(
-                InvalidHeader,
-            )));
+            return Err(InvalidHeader.into());
         }
         let n = d.length()?;
         let s = d.read_slice(n).map_err(primitive::Error::from)?;
@@ -201,10 +205,7 @@ mod tests {
     #[test]
     fn indefinite() {
         let err = test::<&str>("", &[0x7F, 0x60, 0xFF]).unwrap_err();
-        assert_eq!(
-            err,
-            super::Error::Malformed(crate::primitive::Error::InvalidHeader(InvalidHeader))
-        );
+        assert_eq!(err, InvalidHeader.into());
 
         #[cfg(feature = "alloc")]
         {

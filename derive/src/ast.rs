@@ -564,7 +564,7 @@ impl Data {
 
                 let mut error_ty = quote! { __Error<#(#generic_tys),*> };
                 if !naked {
-                    error_ty = quote! { ::tinycbor::collections::Error<::tinycbor::collections::fixed::Error<#error_ty>> };
+                    error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
                 error_ty
             }
@@ -578,8 +578,8 @@ impl Data {
                     }
                 });
                 quote! {
-                    ::tinycbor::collections::Error<::tinycbor::collections::fixed::Error<
-                        ::tinycbor::collections::map::Error<
+                    ::tinycbor::container::Error<::tinycbor::container::bounded::Error<
+                        ::tinycbor::container::map::Error<
                             ::tinycbor::primitive::Error, __Error<#(#generic_tys),*>
                         >
                     >>
@@ -601,7 +601,7 @@ impl Data {
                     ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
                 };
                 if !naked {
-                    error_ty = quote! { ::tinycbor::collections::Error<::tinycbor::collections::fixed::Error<#error_ty>> };
+                    error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
                 error_ty
             }
@@ -632,11 +632,11 @@ impl Data {
                 }
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::Error::Malformed(e)
+                        ::tinycbor::container::Error::Malformed(e)
                     })?;
                     let result = #procedure;
                     if visitor.remaining() != Some(0) {
-                        Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus))?;
+                        Err(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Surplus))?;
                     }
                     result
                 }
@@ -657,12 +657,12 @@ impl Data {
                     #(#variable_defs)*
 
                     let mut visitor = d.map_visitor().map_err(|e| {
-                        ::tinycbor::collections::Error::Malformed(e)
+                        ::tinycbor::container::Error::Malformed(e)
                     })?;
                     loop {
                         if #(#variables.is_some() &&)* true {
                             if visitor.remaining() != Some(0) {
-                                return Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus));
+                                return Err(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Surplus));
                             }
                             break;
                         }
@@ -679,25 +679,25 @@ impl Data {
                         };
                         match result {
                             ::core::result::Result::Ok(::core::result::Result::Err(value_err)) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(
-                                    ::tinycbor::collections::fixed::Error::Inner(
-                                        ::tinycbor::collections::map::Error::Value(
+                            return ::core::result::Result::Err(::tinycbor::container::Error::Content(
+                                    ::tinycbor::container::bounded::Error::Inner(
+                                        ::tinycbor::container::map::Error::Value(
                                             value_err
                                         )
                                     )
                                 )
                             ),
                             ::core::result::Result::Err(key_err) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(
-                                    ::tinycbor::collections::fixed::Error::Inner(
-                                        ::tinycbor::collections::map::Error::Key(
+                            return ::core::result::Result::Err(::tinycbor::container::Error::Content(
+                                    ::tinycbor::container::bounded::Error::Inner(
+                                        ::tinycbor::container::map::Error::Key(
                                             key_err
                                         )
                                     )
                                 )
                             ),
                             ::core::result::Result::Ok(::core::result::Result::Ok(false)) =>
-                            return ::core::result::Result::Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus)),
+                            return ::core::result::Result::Err(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Surplus)),
                             _ => {}
                         }
                     }
@@ -725,18 +725,18 @@ impl Data {
                         quote! {
                             let tag = visitor
                                 .visit::<u64>()
-                                .ok_or(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Missing))?
+                                .ok_or(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Missing))?
                                 .map_err(|e|
-                                    ::tinycbor::collections::Error::Element(
-                                        ::tinycbor::collections::fixed::Error::Inner(
+                                    ::tinycbor::container::Error::Content(
+                                        ::tinycbor::container::bounded::Error::Inner(
                                             ::tinycbor::tag::Error::Malformed(e)
                                         )
                                     )
                                 )?;
                         },
                         quote! {
-                            ::tinycbor::collections::Error::Element(
-                                ::tinycbor::collections::fixed::Error::Inner(::tinycbor::tag::Error::InvalidTag)
+                            ::tinycbor::container::Error::Content(
+                                ::tinycbor::container::bounded::Error::Inner(::tinycbor::tag::Error::InvalidTag)
                             )
                         },
                     )
@@ -759,13 +759,13 @@ impl Data {
 
                 quote! {
                     let mut visitor = d.array_visitor().map_err(|e| {
-                        ::tinycbor::collections::Error::Malformed(e)
+                        ::tinycbor::container::Error::Malformed(e)
                     })?;
 
                     let result = #procedure;
 
                     if visitor.remaining() != Some(0) {
-                        Err(::tinycbor::collections::Error::Element(::tinycbor::collections::fixed::Error::Surplus))?;
+                        Err(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Surplus))?;
                     }
                     result
                 }

@@ -1,20 +1,20 @@
 //! `core::num::NonZero*` types.
 use crate::{CborLen, Decode, Decoder, Encode, Encoder};
 
-/// An error that can occur when decoding non-zero numeric types.
+/// Possible errors when decoding non-zero values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Error<E> {
-    /// Decoded value is zero.
+    /// The value is zero.
     Zero,
-    /// An error occurred while decoding the underlying value.
+    /// Error decoding the value.
     Inner(E),
 }
 
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Zero => write!(f, "decoded value is zero"),
-            Error::Inner(e) => write!(f, "decoding non-zero value: {}", e),
+            Error::Zero => write!(f, "value is zero"),
+            Error::Inner(_) => write!(f, "non-zero value error"),
         }
     }
 }
