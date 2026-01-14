@@ -7,21 +7,21 @@ pub enum Error<E> {
     /// The value is zero.
     Zero,
     /// Error decoding the value.
-    Inner(E),
+    Value(E),
 }
 
 impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::Zero => write!(f, "value is zero"),
-            Error::Inner(_) => write!(f, "non-zero value error"),
+            Error::Value(_) => write!(f, "non-zero value error"),
         }
     }
 }
 
 impl<E> From<E> for Error<E> {
     fn from(e: E) -> Self {
-        Error::Inner(e)
+        Error::Value(e)
     }
 }
 
@@ -29,7 +29,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Error::Zero => None,
-            Error::Inner(e) => Some(e),
+            Error::Value(e) => Some(e),
         }
     }
 }

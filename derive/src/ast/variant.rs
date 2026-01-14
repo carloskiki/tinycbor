@@ -43,11 +43,11 @@ impl Variant {
         let fields = fields.into_iter().map(|f| {
             let error_constructor = if field_count == 1 {
                 quote! {
-                ::tinycbor::tag::Error::Inner(__Error::#variant_name(e)) }
+                ::tinycbor::tag::Error::Content(__Error::#variant_name(e)) }
             } else {
                 let error_name = f.error_name();
                 let ident = quote::format_ident!("{}{}", variant_name, error_name);
-                quote! { ::tinycbor::tag::Error::Inner(__Error::#ident(e)) }
+                quote! { ::tinycbor::tag::Error::Content(__Error::#ident(e)) }
             };
 
             f.decode(&error_constructor, naked)

@@ -53,6 +53,12 @@ impl<E> From<crate::InvalidHeader> for Error<E> {
     }
 }
 
+impl<E> From<bounded::Error<E>> for Error<bounded::Error<E>> {
+    fn from(e: bounded::Error<E>) -> Self {
+        Self::Content(e)
+    }
+}
+
 impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {

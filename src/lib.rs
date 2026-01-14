@@ -1114,7 +1114,7 @@ impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
         let mut inner_decoder = Decoder(bytes);
         T::decode(&mut inner_decoder)
             .map(Encoded)
-            .map_err(|e| tag::Error::Inner(container::Error::Content(e)))
+            .map_err(|e| tag::Error::Content(container::Error::Content(e)))
     }
 }
 

@@ -5,15 +5,15 @@ use embedded_io::Write;
 
 use crate::{CborLen, Decode, Encode, Encoder, InvalidHeader, TAGGED, primitive, type_of};
 
-/// Possible errors when decoding a tagged value.
+/// Possible errors when decoding tagged content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error<E> {
     /// Tag is malformed.
     Malformed(primitive::Error),
     /// Tag does not match the expected tag.
     InvalidTag,
-    /// Error decoding the tagged value.
-    Inner(E),
+    /// Error decoding the tagged content.
+    Content(E),
 }
 
 impl<E> Error<E> {
@@ -22,7 +22,7 @@ impl<E> Error<E> {
         match self {
             Error::Malformed(e) => Error::Malformed(e),
             Error::InvalidTag => Error::InvalidTag,
-            Error::Inner(e) => Error::Inner(f(e)),
+            Error::Content(e) => Error::Content(f(e)),
         }
     }
 }
@@ -32,7 +32,7 @@ impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
         match self {
             Error::Malformed(_) => write!(f, "malformed tag"),
             Error::InvalidTag => write!(f, "invalid tag"),
-            Error::Inner(_) => write!(f, "tagged value error"),
+            Error::Content(_) => write!(f, "tagged content error"),
         }
     }
 }
@@ -60,7 +60,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
         match self {
             Error::Malformed(e) => Some(e),
             Error::InvalidTag => None,
-            Error::Inner(e) => Some(e),
+            Error::Content(e) => Some(e),
         }
     }
 }
@@ -153,7 +153,7 @@ where
             return Err(Error::InvalidTag);
         }
 
-        T::decode(d).map(Tagged::<T, N>).map_err(Error::Inner)
+        T::decode(d).map(Tagged::<T, N>).map_err(Error::Content)
     }
 }
 

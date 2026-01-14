@@ -73,7 +73,7 @@ impl Container {
                     e.map(|e| match e {})
                 })?;
                 (|| { #procedure })().map_err(|e| {
-                    ::tinycbor::tag::Error::Inner(e)
+                    ::tinycbor::tag::Error::Content(e)
                 })
             };
 
@@ -680,7 +680,7 @@ impl Data {
                         match result {
                             ::core::result::Result::Ok(::core::result::Result::Err(value_err)) =>
                             return ::core::result::Result::Err(::tinycbor::container::Error::Content(
-                                    ::tinycbor::container::bounded::Error::Inner(
+                                    ::tinycbor::container::bounded::Error::Content(
                                         ::tinycbor::container::map::Error::Value(
                                             value_err
                                         )
@@ -689,7 +689,7 @@ impl Data {
                             ),
                             ::core::result::Result::Err(key_err) =>
                             return ::core::result::Result::Err(::tinycbor::container::Error::Content(
-                                    ::tinycbor::container::bounded::Error::Inner(
+                                    ::tinycbor::container::bounded::Error::Content(
                                         ::tinycbor::container::map::Error::Key(
                                             key_err
                                         )
@@ -728,7 +728,7 @@ impl Data {
                                 .ok_or(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Missing))?
                                 .map_err(|e|
                                     ::tinycbor::container::Error::Content(
-                                        ::tinycbor::container::bounded::Error::Inner(
+                                        ::tinycbor::container::bounded::Error::Content(
                                             ::tinycbor::tag::Error::Malformed(e)
                                         )
                                     )
@@ -736,7 +736,7 @@ impl Data {
                         },
                         quote! {
                             ::tinycbor::container::Error::Content(
-                                ::tinycbor::container::bounded::Error::Inner(::tinycbor::tag::Error::InvalidTag)
+                                ::tinycbor::container::bounded::Error::Content(::tinycbor::tag::Error::InvalidTag)
                             )
                         },
                     )

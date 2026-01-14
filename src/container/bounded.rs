@@ -11,7 +11,7 @@ pub enum Error<E> {
     /// Unexpected surplus content.
     Surplus,
     /// Error decoding the content.
-    Inner(E),
+    Content(E),
 }
 
 impl<E> Error<E> {
@@ -20,7 +20,7 @@ impl<E> Error<E> {
         match self {
             Error::Missing => Error::Missing,
             Error::Surplus => Error::Surplus,
-            Error::Inner(e) => Error::Inner(f(e)),
+            Error::Content(e) => Error::Content(f(e)),
         }
     }
 }
@@ -30,8 +30,14 @@ impl<E: core::fmt::Display> core::fmt::Display for Error<E> {
         match self {
             Error::Missing => write!(f, "missing content"),
             Error::Surplus => write!(f, "too much content"),
-            Error::Inner(_) => write!(f, "bounded content error"),
+            Error::Content(_) => write!(f, "bounded content error"),
         }
+    }
+}
+
+impl<E> From<E> for Error<E> {
+    fn from(e: E) -> Self {
+        Error::Content(e)
     }
 }
 
@@ -40,7 +46,7 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
         match self {
             Error::Missing => None,
             Error::Surplus => None,
-            Error::Inner(e) => Some(e),
+            Error::Content(e) => Some(e),
         }
     }
 }
@@ -93,7 +99,7 @@ where
                 visitor
                     .visit::<T>()
                     .ok_or(super::Error::Content(Error::Missing))?
-                    .map_err(|e| super::Error::Content(Error::Inner(e)))?,
+                    .map_err(|e| super::Error::Content(Error::Content(e)))?,
             );
             guard.initialized += 1;
         }
@@ -144,7 +150,7 @@ where
             let v = visitor
                 .visit()
                 .ok_or(super::Error::Content(Error::Missing))?
-                .map_err(|e| super::Error::Content(Error::Inner(e)))?;
+                .map_err(|e| super::Error::Content(Error::Content(e)))?;
             elem.write(v);
             guard.initialized += 1;
         }

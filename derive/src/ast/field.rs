@@ -186,7 +186,7 @@ impl Field {
                 visitor.visit::<#ty>()
                 .ok_or(::tinycbor::container::Error::Content(::tinycbor::container::bounded::Error::Missing))?
                 .map_err(|e| ::tinycbor::container::Error::Content(
-                    ::tinycbor::container::bounded::Error::Inner(#error_constructor)
+                    ::tinycbor::container::bounded::Error::Content(#error_constructor)
                 ))
             }
         };
