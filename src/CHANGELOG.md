@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# 0.9.0 - 2026-01-13
+
+### Added
+
+- Various `From` impls for error types to convert from the underlying errors.
+
+### Changed
+
+- `primitive::Error` variants don't needlessly store their unit content.
+- `collections` module renamed to `container`.
+- `fixed` module renamed to `bounded`.
+
 # 0.8.0 - 2026-01-12
 
 ### Added
