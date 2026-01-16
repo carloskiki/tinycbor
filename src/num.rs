@@ -6,7 +6,7 @@ use crate::{
 pub mod nonzero;
 
 /// Possible errors when decoding numbers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error {
     /// Number is malformed.
     Malformed(primitive::Error),

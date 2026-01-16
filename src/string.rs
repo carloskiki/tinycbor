@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// Possible errors when decoding UTF-8 strings.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error {
     /// String is malformed.
     Malformed(primitive::Error),

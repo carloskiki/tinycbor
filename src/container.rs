@@ -8,7 +8,7 @@ pub mod bounded;
 pub mod map;
 
 /// Possible errors when decoding containers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error<E> {
     /// Container header is malformed.
     Malformed(primitive::Error),

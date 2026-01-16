@@ -5,7 +5,7 @@ use crate::{CborLen, Encode, Encoder};
 use crate::{Decode, Decoder};
 
 /// Possible errors when decoding a map entry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error<K, V> {
     /// Error decoding the key.
     Key(K),

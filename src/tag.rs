@@ -6,7 +6,7 @@ use embedded_io::Write;
 use crate::{CborLen, Decode, Encode, Encoder, InvalidHeader, TAGGED, primitive, type_of};
 
 /// Possible errors when decoding tagged content.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error<E> {
     /// Tag is malformed.
     Malformed(primitive::Error),

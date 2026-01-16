@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
 use crate::{CborLen, Decode, Decoder, Encode};
 
 /// Possible errors when decoding size-bounded containers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error<E> {
     /// Not enough content.
     Missing,

@@ -4,7 +4,7 @@ use core::fmt::{Display, Formatter};
 use crate::{CborLen, Decode, Decoder, Encode, Encoder, EndOfInput, InvalidHeader, SIMPLE, Write};
 
 /// Possible errors when decoding CBOR primitive types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error {
     /// Input ended unexpectedly.
     EndOfInput,

@@ -2,7 +2,7 @@
 use crate::{CborLen, Decode, Decoder, Encode, Encoder};
 
 /// Possible errors when decoding non-zero values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Error<E> {
     /// The value is zero.
     Zero,
