@@ -360,7 +360,11 @@ pub enum Data {
 }
 
 impl Data {
-    pub fn error_def(&self, error_name: &syn::Ident, name: &syn::Ident) -> Option<(TokenStream, TokenStream)> {
+    pub fn error_def(
+        &self,
+        error_name: &syn::Ident,
+        name: &syn::Ident,
+    ) -> Option<(TokenStream, TokenStream)> {
         // Returns (display_arms, error_arms)
         fn _impl(iter: impl Iterator<Item = (String, syn::Ident)>) -> (TokenStream, TokenStream) {
             iter.map(|(message, variant_name)| {
@@ -474,7 +478,8 @@ impl Data {
                                 } else {
                                     quote::format_ident!("{}{}", ident, f.error_name())
                                 };
-                                let message = format!("{} of variant `{}`", f.error_message(), ident);
+                                let message =
+                                    format!("{} of variant `{}`", f.error_message(), ident);
                                 (
                                     quote! {
                                         #name(#ty),
