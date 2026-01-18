@@ -45,7 +45,7 @@ impl Container {
         let (_, ty_generics, _) = generics.split_for_impl();
         let ty_generics = quote! { #ty_generics };
 
-        let (error_def, error_impl) = data.error_def(&error).unzip();
+        let (error_def, error_impl) = data.error_def(&error, &ident).unzip();
         let error_import = if error_def.is_some() {
             quote! { use #error as __Error; }
         } else {
@@ -360,13 +360,13 @@ pub enum Data {
 }
 
 impl Data {
-    pub fn error_def(&self, name: &syn::Ident) -> Option<(TokenStream, TokenStream)> {
+    pub fn error_def(&self, error_name: &syn::Ident, name: &syn::Ident) -> Option<(TokenStream, TokenStream)> {
         // Returns (display_arms, error_arms)
         fn _impl(iter: impl Iterator<Item = (String, syn::Ident)>) -> (TokenStream, TokenStream) {
             iter.map(|(message, variant_name)| {
                 (
                     quote! {
-                        __Error::#variant_name(_0) => ::core::write!(formatter, #message, _0),
+                        __Error::#variant_name(_0) => ::core::write!(formatter, #message),
                     },
                     quote! {
                         __Error::#variant_name(_0) => ::core::option::Option::Some(_0),
@@ -504,7 +504,7 @@ impl Data {
 
         let definition = quote! {
             #[derive(::core::fmt::Debug)]
-            pub #container #name <#(#error_generics),*> #content
+            pub #container #error_name <#(#error_generics),*> #content
         };
 
         let (diplay_bounds, error_bounds) = error_generics
@@ -528,7 +528,7 @@ impl Data {
                         #display_arms
                         _ => ::core::unreachable!(),
                     }?;
-                    ::core::write!(formatter, "in type `{}`", stringify!(#name))
+                    ::core::write!(formatter, " in type `{}`", stringify!(#name))
                 }
             }
 
