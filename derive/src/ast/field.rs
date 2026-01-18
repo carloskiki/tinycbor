@@ -138,7 +138,7 @@ impl Field {
     }
 
     pub fn error_message(&self) -> String {
-        format!("in field `{}`: {{0}}", self.member.to_token_stream())
+        format!("while decoding field `{}`", self.member.to_token_stream())
     }
 
     pub fn decode_ty(&self) -> TokenStream {

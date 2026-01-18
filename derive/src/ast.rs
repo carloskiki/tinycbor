@@ -474,11 +474,12 @@ impl Data {
                                 } else {
                                     quote::format_ident!("{}{}", ident, f.error_name())
                                 };
+                                let message = format!("{} of variant `{}`", f.error_message(), ident);
                                 (
                                     quote! {
                                         #name(#ty),
                                     },
-                                    (f.error_message(), name),
+                                    (message, name),
                                 )
                             })
                             .collect::<Vec<_>>()
@@ -523,12 +524,11 @@ impl Data {
             {
 
                 fn fmt(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    ::core::write!(formatter, "in {}: ", stringify!(#name))?;
-
                     match self {
                         #display_arms
                         _ => ::core::unreachable!(),
-                    }
+                    }?;
+                    ::core::write!(formatter, "in type `{}`", stringify!(#name))
                 }
             }
 
