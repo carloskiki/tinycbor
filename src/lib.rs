@@ -820,7 +820,6 @@ impl<'b> MapVisitor<'_, 'b> {
                 if let Ok(BREAK) = self.decoder.peek() {
                     self.decoder.read().expect("was peeked");
                     self.state = State::Indef(true);
-                    
                 }
                 match key {
                     Ok(k) => {
@@ -830,7 +829,7 @@ impl<'b> MapVisitor<'_, 'b> {
                             self.state = State::Indef(true);
                         }
                         Some(Ok(value))
-                    },
+                    }
                     Err(e) => Some(Err(e)),
                 }
             }
