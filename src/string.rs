@@ -1,58 +1,26 @@
 //! Text.
 use crate::{
-    CborLen, Decode, Decoder, Encode, Encoder, InvalidHeader, TEXT, info_of, primitive, type_of,
+    CborLen, Decode, Decoder, Encode, Encoder, InvalidHeader, TEXT, container, info_of, primitive,
+    type_of,
 };
 
-/// Possible errors when decoding UTF-8 strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Error {
-    /// String is malformed.
-    Malformed(primitive::Error),
-    /// String is not valid UTF-8.
-    Utf8,
-}
+/// The text is not valid UTF-8.
+pub struct InvalidUtf8;
 
-impl core::fmt::Display for Error {
+impl core::fmt::Display for InvalidUtf8 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Error::Malformed(_) => write!(f, "malformed string"),
-            Error::Utf8 => write!(f, "invalid utf-8 string"),
-        }
+        write!(f, "invalid utf-8 string")
     }
 }
 
-impl From<primitive::Error> for Error {
-    fn from(e: primitive::Error) -> Self {
-        Error::Malformed(e)
-    }
-}
-
-impl From<core::str::Utf8Error> for Error {
+impl From<core::str::Utf8Error> for InvalidUtf8 {
     fn from(_: core::str::Utf8Error) -> Self {
-        Error::Utf8
+        InvalidUtf8
     }
 }
 
-impl From<crate::EndOfInput> for Error {
-    fn from(_: crate::EndOfInput) -> Self {
-        Error::Malformed(primitive::Error::EndOfInput)
-    }
-}
-
-impl From<crate::InvalidHeader> for Error {
-    fn from(_: crate::InvalidHeader) -> Self {
-        Error::Malformed(primitive::Error::InvalidHeader)
-    }
-}
-
-impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            Error::Malformed(e) => Some(e),
-            Error::Utf8 => None,
-        }
-    }
-}
+impl core::error::Error for InvalidUtf8 {}
 
 /// Decodes a definite-length string.
 ///
@@ -62,7 +30,7 @@ impl<'a, 'b> Decode<'b> for &'a str
 where
     'b: 'a,
 {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let b = d.peek().map_err(primitive::Error::from)?;
@@ -70,8 +38,8 @@ where
             return Err(InvalidHeader.into());
         }
         let n = d.length()?;
-        let s = d.read_slice(n).map_err(primitive::Error::from)?;
-        core::str::from_utf8(s).map_err(Error::from)
+        let s = d.read_slice(n)?;
+        core::str::from_utf8(s).map_err(|_| container::Error::Content(InvalidUtf8))
     }
 }
 
@@ -92,7 +60,7 @@ impl CborLen for str {
 /// Decodes a byte string, supporting both definite-length and indefinite-length encodings.
 #[cfg(feature = "alloc")]
 impl<'a> Decode<'a> for alloc::string::String {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         d.str_iter()?.collect()
     }
@@ -115,7 +83,7 @@ impl CborLen for alloc::string::String {
 /// Decodes a byte string, supporting both definite-length and indefinite-length encodings.
 #[cfg(feature = "alloc")]
 impl<'a> Decode<'a> for alloc::boxed::Box<str> {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         d.str_iter()?.collect()
     }
@@ -129,34 +97,34 @@ impl<'a> Decode<'a> for alloc::boxed::Box<str> {
 /// such as `PathBuf` or `Box<Path>`.
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for &'b std::path::Path {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
 
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         <&'b str>::decode(d).map(std::path::Path::new)
     }
 }
 
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for Box<std::path::Path> {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
 
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         std::path::PathBuf::decode(d).map(std::path::PathBuf::into_boxed_path)
     }
 }
 
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for std::path::PathBuf {
-    type Error = Error;
+    type Error = container::Error<InvalidUtf8>;
 
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Error> {
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         <&'b std::path::Path>::decode(d).map(std::path::Path::to_path_buf)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{InvalidHeader, test};
+    use crate::{InvalidHeader, container, string::InvalidUtf8, test};
 
     #[test]
     fn empty() {
@@ -167,6 +135,24 @@ mod tests {
 
             assert!(test::<String>(String::new(), &[0x60]).unwrap());
             assert!(test::<Box<str>>(Box::<str>::from(""), &[0x60]).unwrap());
+        }
+    }
+
+    #[test]
+    fn invalid_utf8() {
+        let cbor = [0x62, 0xff, 0xff];
+        let err = test::<&str>("", &cbor).unwrap_err();
+        assert_eq!(err, container::Error::Content(InvalidUtf8));
+
+        #[cfg(feature = "alloc")]
+        {
+            use alloc::{boxed::Box, string::String};
+
+            let err = test::<String>(String::new(), &cbor).unwrap_err();
+            assert_eq!(err, container::Error::Content(InvalidUtf8));
+
+            let err = test::<Box<str>>(Box::<str>::from(""), &cbor).unwrap_err();
+            assert_eq!(err, container::Error::Content(InvalidUtf8));
         }
     }
 

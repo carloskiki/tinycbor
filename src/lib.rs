@@ -404,7 +404,7 @@ impl<'b> Decoder<'b> {
 /// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
 impl<'b> Iterator for Decoder<'b> {
-    type Item = Result<Token<'b>, string::Error>;
+    type Item = Result<Token<'b>, container::Error<string::InvalidUtf8>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.0.is_empty() {
@@ -714,7 +714,7 @@ pub struct StrIter<'a, 'b> {
 }
 
 impl<'b> Iterator for StrIter<'_, 'b> {
-    type Item = Result<&'b str, string::Error>;
+    type Item = Result<&'b str, container::Error<string::InvalidUtf8>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.state {
@@ -732,8 +732,11 @@ impl<'b> Iterator for StrIter<'_, 'b> {
                 Some(
                     self.decoder
                         .read_slice(n)
-                        .map_err(string::Error::from)
-                        .and_then(|slice| core::str::from_utf8(slice).map_err(string::Error::from)),
+                        .map_err(Into::into)
+                        .and_then(|slice| {
+                            core::str::from_utf8(slice)
+                                .map_err(|_| container::Error::Content(string::InvalidUtf8))
+                        }),
                 )
             }
         }
@@ -989,7 +992,7 @@ impl core::fmt::Display for Token<'_> {
 }
 
 impl<'b> Decode<'b> for Token<'b> {
-    type Error = string::Error;
+    type Error = container::Error<string::InvalidUtf8>;
 
     fn decode(d: &mut crate::Decoder<'b>) -> Result<Self, Self::Error> {
         Ok(match d.datatype()? {
@@ -1153,7 +1156,7 @@ impl<'a, 'b> Decode<'b> for Any<'a>
 where
     'b: 'a,
 {
-    type Error = string::Error;
+    type Error = container::Error<string::InvalidUtf8>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         use alloc::{vec, vec::Vec};
@@ -1168,9 +1171,6 @@ where
         fn top(stack: &[Frame]) -> &Frame {
             stack.last().expect("stack is non-empty")
         }
-        fn invalid_header() -> string::Error {
-            InvalidHeader.into()
-        }
 
         let mut stack: Vec<Frame> = vec![Frame::Count(0)];
         let start = d.0;
@@ -1182,7 +1182,7 @@ where
                 || (matches!(top(&stack), Frame::IndefString)
                     && !matches!(token, Token::String(_) | Token::Break))
             {
-                return Err(invalid_header());
+                return Err(InvalidHeader.into());
             }
 
             match token {
@@ -1197,7 +1197,7 @@ where
                 Token::Break if !matches!(top(&stack), Frame::Count(_)) => {
                     stack.pop();
                 }
-                Token::Break => return Err(invalid_header()),
+                Token::Break => return Err(InvalidHeader.into()),
 
                 Token::Tag(_) => continue,
 
