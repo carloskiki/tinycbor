@@ -178,6 +178,14 @@
 //! has no effect when deriving `Encode` or `CborLen`. By default, the error type is named
 //! `Error`.
 //!
+//! `#[derive(Decode)]` may not generate an error type. Those cases are:
+//! - Fieldless structs.
+//! - `naked` structs with a single field.
+//! - Variantless enums.
+//! - `naked` C-like enums.
+//!
+//! In those cases, this attribute has no effect.
+//!
 //! ```no_run
 //! use tinycbor_derive::{Decode};
 //!
@@ -305,6 +313,17 @@
 //!    #[n(2)]
 //!    Sunday,
 //! }
+//! ```
+//!
+//! Another usecase is to create newtype wrappers that do not add any CBOR structure around the
+//! inner type.
+//!
+//! ```no_run
+//! use tinycbor_derive::{Encode, Decode, CborLen};
+//!
+//! #[derive(Encode, Decode, CborLen)]
+//! #[cbor(naked)]
+//! struct UserId(u64);
 //! ```
 //!
 //! When the resulting representation is more than one CBOR element, the type should not be used as
