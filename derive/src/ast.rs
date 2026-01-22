@@ -541,7 +541,7 @@ impl Data {
             impl #generics ::core::error::Error for __Error #generics
                 where #error_bounds
             {
-                fn source(&self) -> Option<&(dyn ::core::error::Error + 'static)> {
+                fn source(&self) -> ::core::option::Option<&(dyn ::core::error::Error + 'static)> {
                     match self {
                         #error_arms
                         _ => ::core::unreachable!(),
