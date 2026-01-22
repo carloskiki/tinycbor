@@ -447,7 +447,7 @@ impl Data {
                         .map(|mf| (mf.field.error_message(), mf.field.error_name())),
                 ),
             ),
-            Data::Array { fields, .. } if fields.len() == 1 => (
+            Data::Array { fields, naked } if fields.len() == 1 && !naked => (
                 false,
                 {
                     let ty = variant_ty(&fields[0]);
