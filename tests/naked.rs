@@ -1,7 +1,7 @@
 use tinycbor_derive::{Encode, Decode, CborLen};
 use tinycbor::*;
 
-#[derive(Encode, Decode, CborLen)]
+#[derive(Debug, PartialEq, Encode, Decode, CborLen)]
 #[cbor(naked, error = "HelloError")]
 pub enum Hello {
     #[n(0)]
@@ -14,7 +14,7 @@ pub enum Hello {
     Folks,
 }
 
-#[derive(Encode, Decode, CborLen)]
+#[derive(Debug, PartialEq, Encode, Decode, CborLen)]
 #[cbor(naked)]
 pub struct Wrapper(u64);
 

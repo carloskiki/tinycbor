@@ -46,11 +46,9 @@ impl Container {
         let ty_generics = quote! { #ty_generics };
 
         let (error_def, error_impl) = data.error_def(&error, &ident).unzip();
-        let error_import = if error_def.is_some() {
-            quote! { use #error as __Error; }
-        } else {
-            quote! { use ::core::convert::Infallible as __Error; }
-        };
+        let error_import = error_def
+            .is_some()
+            .then(|| quote! { use #error as __Error; });
         let mut error_ty = data.error_ty();
 
         let lifetimes = generics
@@ -554,7 +552,13 @@ impl Data {
 
     pub fn error_ty(&self) -> TokenStream {
         match self {
-            Data::Array { fields, naked } => {
+            Data::Array { fields, naked } if !fields.is_empty() => {
+                if fields.len() == 1 && *naked {
+                    let f = &fields[0];
+                    let ty = f.decode_ty();
+                    return quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error };
+                }
+                
                 let generic_tys = fields
                     .iter()
                     .filter_map(|f| {
@@ -573,7 +577,7 @@ impl Data {
                 }
                 error_ty
             }
-            Data::Map(fields) => {
+            Data::Map(fields) if !fields.is_empty() => {
                 let generic_tys = fields.iter().filter_map(|f| {
                     if f.field.generic {
                         let ty = f.field.decode_ty();
@@ -601,15 +605,21 @@ impl Data {
                         }
                     })
                 });
+                let mut error_ty = if variants.iter().map(|v| v.fields.len()).sum::<usize>() == 0 {
+                    quote! { ::core::convert::Infallible }
+                } else {
+                    quote! { __Error<#(#generic_tys),*> }
+                };
 
-                let mut error_ty = quote! {
-                    ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
+                error_ty = quote! {
+                    ::tinycbor::tag::Error<#error_ty>
                 };
                 if !naked {
                     error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
                 error_ty
             }
+            _ => quote! { ::core::convert::Infallible }
         }
     }
 
@@ -619,7 +629,11 @@ impl Data {
                 let field_count = fields.len();
                 let fields = fields.into_iter().map(|f| {
                     let error_constructor = if field_count == 1 {
-                        quote! { __Error(e) }
+                        if naked {
+                            quote! { e }
+                        } else {
+                            quote! { __Error(e) }
+                        }
                     } else {
                         let error_name = f.error_name();
                         quote! { __Error::#error_name(e) }
