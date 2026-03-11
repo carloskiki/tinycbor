@@ -316,7 +316,7 @@ impl MapField {
         let extension = self.field.decode_extension();
         let ty_span = ty.span();
         let error_constructor = if single {
-            quote! { __Error }
+            quote! {}
         } else {
             quote! { __Error::#error_name }
         };

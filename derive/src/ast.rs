@@ -45,10 +45,14 @@ impl Container {
         let (_, ty_generics, _) = generics.split_for_impl();
         let ty_generics = quote! { #ty_generics };
 
-        let (error_def, error_impl) = data.error_def(&error, &ident).unzip();
-        let error_import = error_def
-            .is_some()
-            .then(|| quote! { use #error as __Error; });
+        let error_def = data.error_def(&error, &ident);
+        let error_alias = if error_def.is_none() {
+            quote! { ::core::convert::Infallible }
+        } else {
+            error.to_token_stream()
+        };
+        let (error_def, error_impl) = error_def.unzip();
+
         let mut error_ty = data.error_ty();
 
         let lifetimes = generics
@@ -91,7 +95,7 @@ impl Container {
             #error_def
 
             const _: () = {
-                #error_import
+                type __Error = #error_alias;
 
                 #error_impl
 
@@ -340,6 +344,22 @@ impl TryFrom<syn::DeriveInput> for Container {
             }
         };
 
+        if tag.is_some()
+            && match data {
+                Data::Array { ref fields, naked } => fields.is_empty() && naked,
+                Data::Map(_) => false,
+                Data::Enum {
+                    ref variants,
+                    naked,
+                } => variants.is_empty() && naked,
+            }
+        {
+            return Err(syn::Error::new_spanned(
+                input.ident,
+                "empty and containers cannot be tagged and naked",
+            ));
+        }
+
         Ok(Container {
             tag,
             bounds,
@@ -358,6 +378,10 @@ pub enum Data {
 }
 
 impl Data {
+    // FIXME: When we have associated type impl trait, always generate an error type, but don't
+    // expose it in the generated code. Use `impl Error` in the associated type. This way the code
+    // here is less complicated (don't check for single field or no field cases) and we have better
+    // error messages.
     pub fn error_def(
         &self,
         error_name: &syn::Ident,
@@ -377,14 +401,6 @@ impl Data {
             })
             .collect::<(TokenStream, TokenStream)>()
         }
-        let struct_impl = (
-            quote! {
-                __Error(_0) => ::core::write!(formatter, "{}", _0),
-            },
-            quote! {
-                __Error(_0) => ::core::option::Option::Some(_0),
-            },
-        );
 
         let mut generic_count = 0usize;
         let mut variant_ty = |field: &Field| {
@@ -444,22 +460,6 @@ impl Data {
                         .iter()
                         .map(|mf| (mf.field.error_message(), mf.field.error_name())),
                 ),
-            ),
-            Data::Array { fields, naked } if fields.len() == 1 && !naked => (
-                false,
-                {
-                    let ty = variant_ty(&fields[0]);
-                    quote! { (pub #ty); }
-                },
-                struct_impl.clone(),
-            ),
-            Data::Map(map_fields) if map_fields.len() == 1 => (
-                false,
-                {
-                    let ty = variant_ty(&map_fields[0].field);
-                    quote! { (pub #ty); }
-                },
-                struct_impl.clone(),
             ),
             Data::Enum { variants, .. } => {
                 let (tokens, impl_material) = variants
@@ -551,45 +551,51 @@ impl Data {
     }
 
     pub fn error_ty(&self) -> TokenStream {
-        match self {
-            Data::Array { fields, naked } if !fields.is_empty() => {
-                if fields.len() == 1 && *naked {
-                    let f = &fields[0];
-                    let ty = f.decode_ty();
-                    return quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error };
-                }
-                
-                let generic_tys = fields
-                    .iter()
-                    .filter_map(|f| {
-                        if f.generic {
-                            let ty = f.decode_ty();
-                            Some(quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error })
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>();
+        let field_error = |field: &Field| {
+            let ty = field.decode_ty();
+            quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error }
+        };
 
-                let mut error_ty = quote! { __Error<#(#generic_tys),*> };
+        match self {
+            Data::Array { fields, naked } => {
+                let mut error_ty = if fields.len() == 1 {
+                    field_error(&fields[0])
+                } else {
+                    let generic_tys = fields
+                        .iter()
+                        .filter_map(|f| {
+                            if f.generic {
+                                Some(field_error(f))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    quote! { __Error<#(#generic_tys),*> }
+                };
+
                 if !naked {
                     error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
                 error_ty
             }
-            Data::Map(fields) if !fields.is_empty() => {
-                let generic_tys = fields.iter().filter_map(|f| {
-                    if f.field.generic {
-                        let ty = f.field.decode_ty();
-                        Some(quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error })
-                    } else {
-                        None
-                    }
-                });
+            Data::Map(fields) => {
+                let error_ty = if fields.len() == 1 {
+                    field_error(&fields[0].field)
+                } else {
+                    let generic_tys = fields.iter().filter_map(|f| {
+                        if f.field.generic {
+                            Some(field_error(&f.field))
+                        } else {
+                            None
+                        }
+                    });
+                    quote! { __Error<#(#generic_tys),*> }
+                };
                 quote! {
                     ::tinycbor::container::Error<::tinycbor::container::bounded::Error<
                         ::tinycbor::container::map::Error<
-                            ::tinycbor::primitive::Error, __Error<#(#generic_tys),*>
+                            ::tinycbor::primitive::Error, #error_ty
                         >
                     >>
                 }
@@ -605,21 +611,14 @@ impl Data {
                         }
                     })
                 });
-                let mut error_ty = if variants.iter().map(|v| v.fields.len()).sum::<usize>() == 0 {
-                    quote! { ::core::convert::Infallible }
-                } else {
-                    quote! { __Error<#(#generic_tys),*> }
-                };
-
-                error_ty = quote! {
-                    ::tinycbor::tag::Error<#error_ty>
+                let mut error_ty = quote! {
+                    ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
                 };
                 if !naked {
                     error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
                 error_ty
             }
-            _ => quote! { ::core::convert::Infallible }
         }
     }
 
@@ -629,11 +628,7 @@ impl Data {
                 let field_count = fields.len();
                 let fields = fields.into_iter().map(|f| {
                     let error_constructor = if field_count == 1 {
-                        if naked {
-                            quote! { e }
-                        } else {
-                            quote! { __Error(e) }
-                        }
+                        quote! { e }
                     } else {
                         let error_name = f.error_name();
                         quote! { __Error::#error_name(e) }
@@ -885,7 +880,7 @@ impl Data {
                     let Self { #destructure } = self;
 
                     #container
-                    #(#procedures)+*
+                    #(#procedures+)* 0
                 }
             }
             Data::Map(map_fields) => {
@@ -925,7 +920,7 @@ impl Data {
                 quote! {
                     match self {
                         #(#arms)*
-                        _ => ::core::unreachable!(),
+                        _ => 0 /* unreachable!() */,
                     }
                 }
             }

@@ -42,6 +42,14 @@ enum TagOnly {
 }
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
+#[cbor(error = "EmptyArrayError")]
+struct EmptyArray;
+
+#[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
+#[cbor(map, error = "EmptyMapError")]
+struct EmptyMap;
+
+#[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
 #[cbor(error = "PartAError", tag(1001))]
 struct PartA {
     #[proptest(value = "Null")]
@@ -51,6 +59,8 @@ struct PartA {
     d: Vec<u8>,
     #[cbor(tag(42))]
     e: RefCell<Box<[u8]>>,
+    f: EmptyArray,
+    g: EmptyMap,
 }
 
 #[derive(Debug, Encode, Decode, CborLen, Arbitrary, PartialEq)]
