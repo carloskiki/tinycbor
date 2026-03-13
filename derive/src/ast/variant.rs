@@ -35,15 +35,18 @@ impl Variant {
         })
     }
 
-    pub fn decode(self, naked: bool) -> TokenStream {
+    pub fn decode(self, naked: bool, only_variant: bool) -> TokenStream {
         let Variant { tag, ident, fields } = self;
         let variant_name = &ident;
 
         let field_count = fields.len();
         let fields = fields.into_iter().map(|f| {
             let error_constructor = if field_count == 1 {
-                quote! {
-                ::tinycbor::tag::Error::Content(__Error::#variant_name(e)) }
+                if only_variant {
+                    quote! { ::tinycbor::tag::Error::Content(e) }
+                } else {
+                    quote! { ::tinycbor::tag::Error::Content(__Error::#variant_name(e)) }
+                }
             } else {
                 let error_name = f.error_name();
                 let ident = quote::format_ident!("{}{}", variant_name, error_name);

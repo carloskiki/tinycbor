@@ -487,13 +487,13 @@ impl Data {
                             })
                             .collect::<Vec<_>>()
                     })
-                    .collect::<(TokenStream, Vec<(String, Ident)>)>();
-                if tokens.is_empty() {
+                    .collect::<(Vec<TokenStream>, Vec<(String, Ident)>)>();
+                if tokens.len() < 2 {
                     return None;
                 }
                 (
                     true,
-                    quote! { { #tokens } },
+                    quote! { { #(#tokens)* } },
                     _impl(impl_material.into_iter()),
                 )
             }
@@ -601,19 +601,23 @@ impl Data {
                 }
             }
             Data::Enum { variants, naked } => {
-                let generic_tys = variants.iter().flat_map(|v| {
-                    v.fields.iter().filter_map(|f| {
-                        if f.generic {
-                            let ty = f.decode_ty();
-                            Some(quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error })
-                        } else {
-                            None
-                        }
-                    })
-                });
-                let mut error_ty = quote! {
-                    ::tinycbor::tag::Error<__Error<#(#generic_tys),*>>
+                let mut error_ty = if variants.len() == 1 && variants[0].fields.len() == 1 {
+                    field_error(&variants[0].fields[0])
+                } else {
+                    let generic_tys = variants.iter().flat_map(|v| {
+                        v.fields.iter().filter_map(|f| {
+                            if f.generic {
+                                let ty = f.decode_ty();
+                                Some(quote! { <#ty as ::tinycbor::Decode<'__bytes>>::Error })
+                            } else {
+                                None
+                            }
+                        })
+                    });
+                    quote! { __Error<#(#generic_tys),*> }
                 };
+                error_ty = quote! { ::tinycbor::tag::Error<#error_ty> };
+                
                 if !naked {
                     error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
@@ -722,7 +726,8 @@ impl Data {
                 }
             }
             Data::Enum { variants, naked } => {
-                let arms = variants.into_iter().map(|v| v.decode(naked));
+                let only_variant = variants.len() == 1;
+                let arms = variants.into_iter().map(|v| v.decode(naked, only_variant));
 
                 let (tag, invalid_tag) = if naked {
                     (
