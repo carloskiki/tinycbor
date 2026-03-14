@@ -12,10 +12,10 @@ enum Enum {
 
 #[derive(Debug, Encode, Decode, CborLen, PartialEq)]
 enum WithOthers {
-    #[n(0)]
-    Newtype(u32),
     #[n(1)]
     Unit,
+    #[n(0)]
+    Newtype(u32),
 }
 
 #[test]

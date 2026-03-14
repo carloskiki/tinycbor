@@ -95,7 +95,7 @@ impl Container {
             #error_def
 
             const _: () = {
-                type __Error = #error_alias;
+                use #error_alias as __Error;
 
                 #error_impl
 
@@ -602,7 +602,12 @@ impl Data {
             }
             Data::Enum { variants, naked } => {
                 let mut error_ty = if variants.iter().map(|v| v.fields.len()).sum::<usize>() == 1 {
-                    field_error(&variants[0].fields[0])
+                    field_error(
+                        variants
+                            .iter()
+                            .find_map(|v| v.fields.first())
+                            .expect("there is exactly one field in the enum"),
+                    )
                 } else {
                     let generic_tys = variants.iter().flat_map(|v| {
                         v.fields.iter().filter_map(|f| {
