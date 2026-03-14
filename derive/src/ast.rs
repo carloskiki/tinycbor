@@ -488,7 +488,7 @@ impl Data {
                             .collect::<Vec<_>>()
                     })
                     .collect::<(Vec<TokenStream>, Vec<(String, Ident)>)>();
-                if tokens.len() < 2 {
+                if tokens.len() < 2 && variants.len() < 2 {
                     return None;
                 }
                 (
@@ -617,7 +617,7 @@ impl Data {
                     quote! { __Error<#(#generic_tys),*> }
                 };
                 error_ty = quote! { ::tinycbor::tag::Error<#error_ty> };
-                
+
                 if !naked {
                     error_ty = quote! { ::tinycbor::container::Error<::tinycbor::container::bounded::Error<#error_ty>> };
                 }
