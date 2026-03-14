@@ -488,7 +488,7 @@ impl Data {
                             .collect::<Vec<_>>()
                     })
                     .collect::<(Vec<TokenStream>, Vec<(String, Ident)>)>();
-                if tokens.len() < 2 && variants.len() < 2 {
+                if tokens.len() < 2 {
                     return None;
                 }
                 (
@@ -601,7 +601,7 @@ impl Data {
                 }
             }
             Data::Enum { variants, naked } => {
-                let mut error_ty = if variants.len() == 1 && variants[0].fields.len() == 1 {
+                let mut error_ty = if variants.iter().map(|v| v.fields.len()).sum::<usize>() == 1 {
                     field_error(&variants[0].fields[0])
                 } else {
                     let generic_tys = variants.iter().flat_map(|v| {
@@ -726,8 +726,8 @@ impl Data {
                 }
             }
             Data::Enum { variants, naked } => {
-                let only_variant = variants.len() == 1;
-                let arms = variants.into_iter().map(|v| v.decode(naked, only_variant));
+                let single_field = variants.iter().map(|v| v.fields.len()).sum::<usize>() == 1;
+                let arms = variants.into_iter().map(|v| v.decode(naked, single_field));
 
                 let (tag, invalid_tag) = if naked {
                     (

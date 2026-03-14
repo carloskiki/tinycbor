@@ -8,3 +8,11 @@ enum Enum {
     #[n(0)]
     Newtype(u32),
 }
+
+#[derive(Encode, Decode, CborLen)]
+enum WithOthers {
+    #[n(0)]
+    Newtype(u32),
+    #[n(1)]
+    Unit,
+}
