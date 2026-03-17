@@ -59,6 +59,8 @@ mod bytes;
 pub mod container;
 pub mod num;
 pub mod primitive;
+#[cfg(feature = "alloc")]
+pub mod stream;
 pub mod string;
 pub mod tag;
 mod wrapper;
@@ -1159,70 +1161,10 @@ where
     type Error = container::Error<string::InvalidUtf8>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        use alloc::{vec, vec::Vec};
-
-        enum Frame {
-            Count(usize),
-            IndefArray,
-            IndefMap,
-            IndefBytes,
-            IndefString,
-        }
-        fn top(stack: &[Frame]) -> &Frame {
-            stack.last().expect("stack is non-empty")
-        }
-
-        let mut stack: Vec<Frame> = vec![Frame::Count(0)];
-        let start = d.0;
-
-        'outer: loop {
-            let token = Token::decode(d)?;
-            if (matches!(top(&stack), Frame::IndefBytes)
-                && !matches!(token, Token::Bytes(_) | Token::Break))
-                || (matches!(top(&stack), Frame::IndefString)
-                    && !matches!(token, Token::String(_) | Token::Break))
-            {
-                return Err(InvalidHeader.into());
-            }
-
-            match token {
-                Token::Array(count) => stack.push(Frame::Count(count)),
-                Token::Map(count) => stack.push(Frame::Count(count * 2)),
-
-                Token::BeginBytes => stack.push(Frame::IndefBytes),
-                Token::BeginString => stack.push(Frame::IndefString),
-                Token::BeginArray => stack.push(Frame::IndefArray),
-                Token::BeginMap => stack.push(Frame::IndefMap),
-
-                Token::Break if !matches!(top(&stack), Frame::Count(_)) => {
-                    stack.pop();
-                }
-                Token::Break => return Err(InvalidHeader.into()),
-
-                Token::Tag(_) => continue,
-
-                _ => {}
-            }
-
-            loop {
-                match stack.last() {
-                    Some(Frame::Count(0)) => {
-                        stack.pop();
-                    }
-                    Some(Frame::Count(n)) => {
-                        let n = *n - 1;
-                        *stack.last_mut().expect("stack is non-empty") = Frame::Count(n);
-                        break;
-                    }
-                    None => break 'outer,
-                    _ => break,
-                }
-            }
-        }
-
-        let end = d.0;
-        let len = start.len() - end.len();
-        Ok(Any(&start[..len]))
+        let saved = d.0;
+        let mut any = stream::Any::default();
+        any.feed(d)?;
+        Ok(Any(&saved[..saved.len() - d.0.len()]))
     }
 }
 
