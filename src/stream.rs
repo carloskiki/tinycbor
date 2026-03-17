@@ -94,6 +94,12 @@ impl Any {
             }
         }
     }
+
+    /// Reset the decoder to its initial state.
+    pub fn reset(&mut self) {
+        self.stack.clear();
+        self.stack.push(Frame::Count(0));
+    }
 }
 
 #[cfg(test)]
