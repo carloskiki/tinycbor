@@ -1,9 +1,8 @@
-use tinycbor_derive::{Encode, Decode, CborLen};
 use tinycbor::Decode;
+use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Debug, Encode, Decode, CborLen)]
 enum A {}
-
 
 #[derive(Debug, Encode, Decode, CborLen)]
 #[cbor(naked)]

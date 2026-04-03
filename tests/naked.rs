@@ -1,5 +1,5 @@
-use tinycbor_derive::{Encode, Decode, CborLen};
 use tinycbor::*;
+use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode, CborLen)]
 #[cbor(naked, error = "HelloError")]

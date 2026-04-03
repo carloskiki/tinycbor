@@ -86,20 +86,12 @@ pub struct Lazy<B, T> {
 
 impl<B, T> Lazy<B, T> {
     /// Access the value by decoding it.
-    pub fn decode<'a>(&'a self) -> Result<With<'a, T>, T::Error>
+    pub fn decode<'a>(&'a self) -> Result<T, T::Error>
     where
         B: AsRef<[u8]>,
         T: Decode<'a>,
     {
-        let bytes = self.bytes.as_ref();
-        let mut decoder = crate::Decoder(bytes);
-        T::decode(&mut decoder).map(|value| With {
-            value,
-            bytes: {
-                let offset = decoder.0.as_ptr() as usize - bytes.as_ptr() as usize;
-                &bytes[..offset]
-            },
-        })
+        T::decode(&mut crate::Decoder(self.bytes.as_ref()))
     }
 }
 

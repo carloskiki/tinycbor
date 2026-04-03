@@ -12,7 +12,7 @@ use proptest::{
 };
 use proptest_derive::Arbitrary;
 use tinycbor::{
-    CborLen, Decode, Decoder, Encode, Encoded,
+    CborLen, Decode, Decoder, Encode, Encoded, encoded,
     num::Int,
     primitive::{Null, Simple, Undefined},
 };

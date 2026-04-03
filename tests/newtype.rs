@@ -1,5 +1,5 @@
-use tinycbor_derive::{Encode, Decode, CborLen};
 use tinycbor::{Decode, Decoder, to_vec};
+use tinycbor_derive::{CborLen, Decode, Encode};
 
 #[derive(Debug, Encode, Decode, CborLen, PartialEq)]
 struct Struct(u32);
