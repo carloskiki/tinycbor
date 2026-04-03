@@ -104,3 +104,34 @@ impl<B, T> From<B> for Lazy<B, T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Lazy, With};
+    use crate::{Decode, Decoder};
+    use alloc::{string::String, vec::Vec};
+
+    const HELLO_CBOR: &[u8] = &[0x65, b'h', b'e', b'l', b'l', b'o', 0x00];
+
+    #[test]
+    fn borrow() {
+        let with = With::<&str>::decode(&mut Decoder(HELLO_CBOR)).unwrap();
+        let encoded = <With<'_, &str> as AsRef<[u8]>>::as_ref(&with);
+
+        let lazy_slice = Lazy::<&[u8], &str>::from(encoded);
+        assert_eq!(lazy_slice.decode().unwrap(), "hello");
+    }
+
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn owned() {
+        let with = With::<String>::decode(&mut Decoder(HELLO_CBOR)).unwrap();
+        let encoded = <With<'_, String> as AsRef<[u8]>>::as_ref(&with);
+
+        let lazy_box = Lazy::<Box<[u8]>, String>::from(encoded.to_vec().into_boxed_slice());
+        assert_eq!(lazy_box.decode().unwrap(), "hello");
+
+        let lazy_vec = Lazy::<Vec<u8>, String>::from(encoded.to_vec());
+        assert_eq!(lazy_vec.decode().unwrap(), "hello");
+    }
+}
