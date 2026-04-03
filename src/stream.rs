@@ -1,20 +1,10 @@
-//! Handle fragmented or streamed data.
+//! Handle streamed or fragmented data.
 //!
-//! Instead of processing a single chunk of data with the [`Decoder`] type, this module provides
-//! utilities to process data in chunks as they arrive, which may not constitue a full CBOR object
-//! by themselves.
+//! Instead of processing a continuous slice of data with the [`Decoder`] type, this module provides
+//! utilities to process data in chunks as it arrives.
 
 use crate::{Decode, Decoder, InvalidHeader, Token, container, string::InvalidUtf8};
 use alloc::{vec, vec::Vec};
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Frame {
-    Count(usize),
-    IndefArray,
-    IndefMap,
-    IndefBytes,
-    IndefString,
-}
 
 /// A streaming decoder for any CBOR item.
 ///
@@ -102,6 +92,16 @@ impl Any {
     }
 }
 
+/// Stack frame of the streaming decoder.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum Frame {
+    Count(usize),
+    IndefArray,
+    IndefMap,
+    IndefBytes,
+    IndefString,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::primitive;
@@ -109,11 +109,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn smoke() {
+    fn simple() {
         let mut any = Any::default();
         let mut d = Decoder(&[0x83, 0x01]);
         let result = any.feed(&mut d);
-        assert!(matches!(result, Err(container::Error::Malformed(primitive::Error::EndOfInput))));
+        assert!(matches!(
+            result,
+            Err(container::Error::Malformed(primitive::Error::EndOfInput))
+        ));
         let mut d = Decoder(&[0x02, 0x03, 0xff]);
         any.feed(&mut d).unwrap();
         assert_eq!(d.0, &[0xff]);

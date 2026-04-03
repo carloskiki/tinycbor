@@ -57,6 +57,7 @@ pub use embedded_io::Write;
 
 mod bytes;
 pub mod container;
+pub mod encoded;
 pub mod num;
 pub mod primitive;
 #[cfg(feature = "alloc")]
