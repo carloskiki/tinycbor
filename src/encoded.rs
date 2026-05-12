@@ -8,10 +8,6 @@ use crate::{CborLen, Decode, Encode};
 /// A value with its encoded bytes.
 ///
 /// The value and bytes can be accessed with the [`AsRef`] and [`From`] implementations.
-///
-/// Modification of the value or the bytes is unsupported because the bytes must always match the
-/// value. This is a requirement for [`With`] to implement [`Encode`] and [`CborLen`] efficiently,
-/// by reusing the bytes.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct With<'a, T> {
     value: T,
@@ -27,6 +23,15 @@ impl<T> AsRef<T> for With<'_, T> {
 impl<T> AsRef<[u8]> for With<'_, T> {
     fn as_ref(&self) -> &[u8] {
         self.bytes
+    }
+}
+
+/// Create [`With`] from its parts.
+///
+/// Providing a bytestring that isn't the encoded value triggers unspecified behavior.
+impl<'a, T> From<(T, &'a [u8])> for With<'a, T> {
+    fn from((value, bytes): (T, &'a [u8])) -> Self {
+        With { value, bytes }
     }
 }
 
