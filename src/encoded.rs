@@ -50,13 +50,13 @@ where
     }
 }
 
-impl<'a, T> Decode<'a> for With<'a, T>
+impl<'a, 'b: 'a, T> Decode<'b> for With<'a, T>
 where
-    T: Decode<'a>,
+    T: Decode<'b>,
 {
     type Error = T::Error;
 
-    fn decode(d: &mut crate::Decoder<'a>) -> Result<Self, Self::Error> {
+    fn decode(d: &mut crate::Decoder<'b>) -> Result<Self, Self::Error> {
         let bytes = d.0;
         let value = T::decode(d)?;
         let offset = d.0.as_ptr() as usize - bytes.as_ptr() as usize;
