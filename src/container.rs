@@ -150,7 +150,7 @@ decode_sequential! {
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T: Decode<'b>> Decode<'b> for Box<[T]> {
+impl<'b, T: Decode<'b>> Decode<'b> for alloc::boxed::Box<[T]> {
     type Error = Error<T::Error>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
@@ -229,6 +229,15 @@ mod tests {
                 test(
                     vec!["a", "b", "c"],
                     &[0x83, 0x61, 0x61, 0x61, 0x62, 0x61, 0x63]
+                )
+                .unwrap()
+            );
+
+            assert!(test::<Box<[&str]>>(Box::new([]), EMPTY_ARRAY).unwrap());
+            assert!(
+                test(
+                    Box::new(["x", "y"]),
+                    &[0x82, 0x61, 0x78, 0x61, 0x79]
                 )
                 .unwrap()
             );

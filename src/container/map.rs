@@ -118,8 +118,6 @@ encode_map! {
     std::collections::HashMap<K, V>
 }
 
-// Sequential maps
-
 #[cfg(feature = "alloc")]
 impl<'b, K, V> Decode<'b> for alloc::collections::BinaryHeap<(K, V)>
 where
@@ -202,6 +200,15 @@ decode_sequential! {
     alloc::vec::Vec<(K, V)>, push
     alloc::collections::VecDeque<(K, V)>, push_back
     alloc::collections::LinkedList<(K, V)>, push_back
+}
+
+#[cfg(feature = "alloc")]
+impl<'b, K: Decode<'b>, V: Decode<'b>> Decode<'b> for alloc::boxed::Box<[(K, V)]> {
+    type Error = super::Error<Error<K::Error, V::Error>>;
+
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+        Vec::<(K, V)>::decode(d).map(|v| v.into_boxed_slice())
+    }
 }
 
 macro_rules! encode_sequential {
@@ -291,6 +298,27 @@ mod tests {
         assert!(test(v, &[0xa0]).unwrap());
 
         let v = vec![(10u32, 20u32), (30u32, 40u32), (50u32, 60u32)];
+
+        assert!(
+            test(
+                v,
+                &[
+                    0xa3, 0x0a, 0x14, 0x18, 0x1e, 0x18, 0x28, 0x18, 0x32, 0x18, 0x3c
+                ]
+            )
+            .unwrap()
+        );
+    }
+    
+    #[test]
+    #[cfg(feature = "alloc")]
+    fn box_() {
+        use alloc::boxed::Box;
+
+        let v: Box<[(u32, u32)]> = Box::new([]);
+        assert!(test(v, &[0xa0]).unwrap());
+
+        let v = vec![(10u32, 20u32), (30u32, 40u32), (50u32, 60u32)].into_boxed_slice();
 
         assert!(
             test(
