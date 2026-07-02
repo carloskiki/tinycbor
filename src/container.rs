@@ -149,6 +149,15 @@ decode_sequential! {
     alloc::collections::LinkedList<T>, push_back
 }
 
+#[cfg(feature = "alloc")]
+impl<'b, T: Decode<'b>> Decode<'b> for Box<[T]> {
+    type Error = Error<T::Error>;
+
+    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+        Vec::<T>::decode(d).map(|v| v.into_boxed_slice())
+    }
+}
+
 macro_rules! encode_sequential {
     ($($t:ty)*) => {
         $(
