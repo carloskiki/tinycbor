@@ -1208,10 +1208,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined, tag::Tagged};
-
     #[test]
+    #[cfg(feature = "alloc")]
     fn any() {
+        use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined, tag::Tagged};
+
         let mut encoder = Encoder(Vec::new());
 
         encoder.map(3);

@@ -1,4 +1,4 @@
-#![cfg(not(miri))]
+#![cfg(all(not(miri), feature = "std"))]
 
 use std::{
     cell::{Cell, RefCell},

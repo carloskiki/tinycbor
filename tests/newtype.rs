@@ -1,3 +1,5 @@
+#![cfg(feature = "alloc")]
+
 use tinycbor::{Decode, Decoder, to_vec};
 use tinycbor_derive::{CborLen, Decode, Encode};
 

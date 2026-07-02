@@ -113,30 +113,28 @@ impl<B, T> From<B> for Lazy<B, T> {
 #[cfg(test)]
 mod tests {
     use super::{Lazy, With};
-    use crate::{Decode, Decoder};
-    use alloc::{string::String, vec::Vec};
+    use crate::test;
 
-    const HELLO_CBOR: &[u8] = &[0x65, b'h', b'e', b'l', b'l', b'o', 0x00];
+    const HELLO_CBOR: &[u8] = &[0x65, b'h', b'e', b'l', b'l', b'o'];
 
     #[test]
     fn borrow() {
-        let with = With::<&str>::decode(&mut Decoder(HELLO_CBOR)).unwrap();
-        let encoded = <With<'_, &str> as AsRef<[u8]>>::as_ref(&with);
+        assert!(test(With::from(("hello", HELLO_CBOR)), HELLO_CBOR).unwrap());
 
-        let lazy_slice = Lazy::<&[u8], &str>::from(encoded);
+        let lazy_slice = Lazy::<&[u8], &str>::from(HELLO_CBOR);
         assert_eq!(lazy_slice.decode().unwrap(), "hello");
     }
 
     #[test]
     #[cfg(feature = "alloc")]
     fn owned() {
-        let with = With::<String>::decode(&mut Decoder(HELLO_CBOR)).unwrap();
-        let encoded = <With<'_, String> as AsRef<[u8]>>::as_ref(&with);
+        use alloc::{string::String, vec::Vec};
+        assert!(test(With::from((String::from("hello"), HELLO_CBOR)), HELLO_CBOR).unwrap());
 
-        let lazy_box = Lazy::<Box<[u8]>, String>::from(encoded.to_vec().into_boxed_slice());
+        let lazy_box = Lazy::<Box<[u8]>, String>::from(HELLO_CBOR.to_vec().into_boxed_slice());
         assert_eq!(lazy_box.decode().unwrap(), "hello");
 
-        let lazy_vec = Lazy::<Vec<u8>, String>::from(encoded.to_vec());
+        let lazy_vec = Lazy::<Vec<u8>, String>::from(HELLO_CBOR.to_vec());
         assert_eq!(lazy_vec.decode().unwrap(), "hello");
     }
 }
