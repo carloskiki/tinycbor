@@ -58,11 +58,14 @@ where
     type Error = <T::Owned as Decode<'b>>::Error;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+        let mut fallback = *d;
         if let Ok(borrowed) = <&'a T>::decode(d) {
             return Ok(alloc::borrow::Cow::Borrowed(borrowed));
         }
 
-        Ok(alloc::borrow::Cow::Owned(T::Owned::decode(d)?))
+        let value = alloc::borrow::Cow::Owned(T::Owned::decode(&mut fallback)?);
+        *d = fallback;
+        Ok(value)
     }
 }
 
