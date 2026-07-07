@@ -55,8 +55,8 @@ where
     type Error = super::Error<Error<K::Error, V::Error>>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut m = Self::default();
         let mut visitor = d.map_visitor()?;
+        let mut m = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
         while let Some(pair) = visitor.visit() {
             let (k, v) = pair.map_err(super::Error::Content)?;
             m.insert(k, v);
@@ -128,7 +128,7 @@ where
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let mut visitor = d.map_visitor()?;
-        let mut v = Self::new();
+        let mut v = Self::with_capacity(visitor.remaining().unwrap_or(0));
         while let Some(elem) = visitor.visit() {
             v.push(elem.map_err(super::Error::Content)?);
         }
@@ -148,7 +148,7 @@ where
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let mut visitor = d.map_visitor()?;
-        let mut v = Self::default();
+        let mut v = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
         while let Some(elem) = visitor.visit() {
             v.insert(elem.map_err(super::Error::Content)?);
         }
@@ -177,14 +177,14 @@ where
 
 #[cfg(feature = "alloc")]
 macro_rules! decode_sequential {
-    ($($t:ty, $push:ident)*) => {
+    ($($t:ty, $push:ident, $new:ident $($default:literal)? )*) => {
         $(
             impl<'b, K: Decode<'b>, V: Decode<'b>> Decode<'b> for $t {
                 type Error = super::Error<Error<K::Error, V::Error>>;
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
                     let mut visitor = d.map_visitor()?;
-                    let mut v = Self::new();
+                    let mut v = Self::$new ($(visitor.remaining().unwrap_or($default))?);
                     while let Some(x) = visitor.visit() {
                         v.$push(x.map_err(super::Error::Content)?)
                     }
@@ -197,9 +197,9 @@ macro_rules! decode_sequential {
 
 #[cfg(feature = "alloc")]
 decode_sequential! {
-    alloc::vec::Vec<(K, V)>, push
-    alloc::collections::VecDeque<(K, V)>, push_back
-    alloc::collections::LinkedList<(K, V)>, push_back
+    alloc::vec::Vec<(K, V)>, push, with_capacity 0
+    alloc::collections::VecDeque<(K, V)>, push_back, with_capacity 0
+    alloc::collections::LinkedList<(K, V)>, push_back, new
 }
 
 #[cfg(feature = "alloc")]
@@ -309,7 +309,7 @@ mod tests {
             .unwrap()
         );
     }
-    
+
     #[test]
     #[cfg(feature = "alloc")]
     fn box_() {
