@@ -1118,16 +1118,24 @@ impl<T: ?Sized + Encode + CborLen> Encode for Encoded<T> {
 }
 
 impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
-    type Error = tag::Error<container::Error<T::Error>>;
+    type Error = tag::Error<container::Error<container::bounded::Error<T::Error>>>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let tag::Tagged(bytes) = tag::Tagged::<&'b [u8], { tag::IanaTag::Cbor as u64 }>::decode(d)
             .map_err(|e| e.map(container::Error::Malformed))?;
 
         let mut inner_decoder = Decoder(bytes);
-        T::decode(&mut inner_decoder)
-            .map(Encoded)
-            .map_err(|e| tag::Error::Content(container::Error::Content(e)))
+        let value = T::decode(&mut inner_decoder).map(Encoded).map_err(|e| {
+            tag::Error::Content(container::Error::Content(
+                container::bounded::Error::Content(e),
+            ))
+        })?;
+        if !inner_decoder.0.is_empty() {
+            return Err(tag::Error::Content(container::Error::Content(
+                container::bounded::Error::Surplus,
+            )));
+        }
+        Ok(value)
     }
 }
 
