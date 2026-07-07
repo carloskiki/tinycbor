@@ -77,7 +77,7 @@ where
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let mut visitor = d.array_visitor()?;
-        let mut v = Self::with_capacity(visitor.remaining().unwrap_or(0));
+        let mut v = Self::new();
         while let Some(elem) = visitor.visit() {
             v.push(elem.map_err(Error::Content)?);
         }
@@ -96,7 +96,7 @@ where
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         let mut visitor = d.array_visitor()?;
-        let mut v = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
+        let mut v = Self::default();
         while let Some(elem) = visitor.visit() {
             v.insert(elem.map_err(Error::Content)?);
         }
@@ -124,14 +124,14 @@ where
 
 #[cfg(feature = "alloc")]
 macro_rules! decode_sequential {
-    ($($t:ty, $push:ident, $new:ident $($default:literal)?)*) => {
+    ($($t:ty, $push:ident)*) => {
         $(
             impl<'b, T: Decode<'b>> Decode<'b> for $t {
                 type Error = Error<T::Error>;
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
                     let mut visitor = d.array_visitor()?;
-                    let mut v = Self::$new($(visitor.remaining().unwrap_or($default))?);
+                    let mut v = Self::new();
                     while let Some(x) = visitor.visit() {
                         v.$push(x.map_err(Error::Content)?)
                     }
@@ -144,9 +144,9 @@ macro_rules! decode_sequential {
 
 #[cfg(feature = "alloc")]
 decode_sequential! {
-    alloc::vec::Vec<T>, push, with_capacity 0
-    alloc::collections::VecDeque<T>, push_back, with_capacity 0
-    alloc::collections::LinkedList<T>, push_back, new
+    alloc::vec::Vec<T>, push
+    alloc::collections::VecDeque<T>, push_back
+    alloc::collections::LinkedList<T>, push_back
 }
 
 #[cfg(feature = "alloc")]
@@ -234,7 +234,13 @@ mod tests {
             );
 
             assert!(test::<Box<[&str]>>(Box::new([]), EMPTY_ARRAY).unwrap());
-            assert!(test(Box::new(["x", "y"]), &[0x82, 0x61, 0x78, 0x61, 0x79]).unwrap());
+            assert!(
+                test(
+                    Box::new(["x", "y"]),
+                    &[0x82, 0x61, 0x78, 0x61, 0x79]
+                )
+                .unwrap()
+            );
 
             assert!(test::<VecDeque<String>>(VecDeque::new(), EMPTY_ARRAY).unwrap());
             assert!(
