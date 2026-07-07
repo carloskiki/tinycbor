@@ -50,7 +50,7 @@ impl Any {
 
             match token {
                 Token::Array(count) => self.stack.push(Frame::Count(count)),
-                Token::Map(count) => self.stack.push(Frame::Count(count * 2)),
+                Token::Map(count) => self.stack.push(Frame::Count(count.saturating_mul(2))),
 
                 Token::BeginBytes => self.stack.push(Frame::IndefBytes),
                 Token::BeginString => self.stack.push(Frame::IndefString),
