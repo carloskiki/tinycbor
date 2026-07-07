@@ -51,24 +51,37 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
     }
 }
 
-// Guard to prevent memory leaks in the case of a panic during decoding. This is not
-// strictly nessessary as leaks are allowed in the Rust memory safety model, but this is
-// nice to have if a dependent decides to catch unwinding panics. Our library won't cause a
-// memory leak in that case.
+/// Guard to prevent memory leaks in the case of a panic during decoding.
+///
+/// This is not strictly nessessary as leaks are allowed in the Rust memory safety model, but this
+/// is nice to have if a dependent decides to catch unwinding panics. Our library won't cause a
+/// memory leak in that case.
 struct Guard<T, const N: usize> {
     data: [MaybeUninit<T>; N],
     initialized: usize,
 }
 
 impl<T, const N: usize> Guard<T, N> {
-    /// Safety: Caller must ensure that all elements up to `count` are initialized.
-    unsafe fn assume_init(mut self) -> [T; N] {
-        let data = core::mem::replace(&mut self.data, [const { MaybeUninit::uninit() }; N]);
-        // Don't drop the guard anymore, becuase it contains uninitialized elements.
-        let _ = core::mem::ManuallyDrop::new(self);
+    fn new() -> Self {
+        Self {
+            data: [const { MaybeUninit::uninit() }; N],
+            initialized: 0,
+        }
+    }
+    
+    fn try_init<E>(mut self, mut init: impl FnMut(usize) -> Result<T, E>) -> Result<[T; N], E> {
+        self.data.iter_mut().enumerate().try_for_each(|(i, elem)| {
+            elem.write(init(i)?);
+            self.initialized += 1;
+            Ok(())
+        })?;
 
-        // Safety: Caller has ensured that all elements are initialized.
-        unsafe { data.as_ptr().cast::<[T; N]>().read() }
+        let this = core::mem::ManuallyDrop::new(self);
+
+        // Safety:
+        // All elements are initialized.
+        // `this` will not be dropped => no double drop.
+        Ok(unsafe { (&this.data as *const [MaybeUninit<T>; N] as *const [T; N]).read() })
     }
 }
 
@@ -89,22 +102,12 @@ where
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         let mut visitor = d.array_visitor().map_err(super::Error::Malformed)?;
-        let mut guard = Guard {
-            data: [const { MaybeUninit::uninit() }; N],
-            initialized: 0,
-        };
-
-        for elem in &mut guard.data {
-            elem.write(
-                visitor
-                    .visit::<T>()
-                    .ok_or(super::Error::Content(Error::Missing))?
-                    .map_err(|e| super::Error::Content(Error::Content(e)))?,
-            );
-            guard.initialized += 1;
-        }
-        // Safety: All elements have been initialized.
-        let array = unsafe { guard.assume_init() };
+        let array = Guard::new().try_init(|_| {
+            visitor
+                .visit::<T>()
+                .ok_or(super::Error::Content(Error::Missing))?
+                .map_err(|e| super::Error::Content(Error::Content(e)))
+        })?;
 
         if visitor.remaining() != Some(0) {
             return Err(super::Error::Content(Error::Surplus));
@@ -141,21 +144,12 @@ where
 
     fn decode(d: &mut Decoder<'a>) -> Result<Self, Self::Error> {
         let mut visitor = d.map_visitor()?;
-        let mut guard = Guard {
-            data: [const { MaybeUninit::uninit() }; N],
-            initialized: 0,
-        };
-
-        for elem in &mut guard.data {
-            let v = visitor
+        let array = Guard::new().try_init(|_| {
+            visitor
                 .visit()
                 .ok_or(super::Error::Content(Error::Missing))?
-                .map_err(|e| super::Error::Content(Error::Content(e)))?;
-            elem.write(v);
-            guard.initialized += 1;
-        }
-        // Safety: All elements have been initialized.
-        let array = unsafe { guard.assume_init() };
+                .map_err(|e| super::Error::Content(Error::Content(e)))
+        })?;
 
         if visitor.remaining() != Some(0) {
             return Err(super::Error::Content(Error::Surplus));
