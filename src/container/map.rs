@@ -55,7 +55,7 @@ where
     type Error = super::Error<Error<K::Error, V::Error>>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let max_alloc = d.0.len() / std::mem::size_of::<(K, V)>();
+        let max_alloc = d.0.len() / std::mem::size_of::<(K, V)>().max(1);
         let mut visitor = d.map_visitor()?;
         let mut m = Self::with_capacity_and_hasher(
             visitor.remaining().unwrap_or(0).min(max_alloc),
@@ -131,7 +131,7 @@ macro_rules! decode_sequential {
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
                     #[allow(unused)]
-                    let max_alloc = d.0.len() / core::mem::size_of::<(K, V)>();
+                    let max_alloc = d.0.len() / core::mem::size_of::<(K, V)>().max(1);
                     let mut visitor = d.map_visitor()?;
                     let mut v = Self::$new ($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {

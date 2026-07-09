@@ -77,7 +77,7 @@ macro_rules! decode_sequential {
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
                     #[allow(unused)]
-                    let max_alloc = d.0.len() / core::mem::size_of::<T>();
+                    let max_alloc = d.0.len() / core::mem::size_of::<T>().max(1);
                     let mut visitor = d.array_visitor()?;
                     let mut v = Self::$new($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {
