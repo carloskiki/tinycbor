@@ -69,71 +69,19 @@ impl<E: core::error::Error + 'static> core::error::Error for Error<E> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, T> Decode<'b> for alloc::collections::BinaryHeap<T>
-where
-    T: Decode<'b> + Ord,
-{
-    type Error = Error<T::Error>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.array_visitor()?;
-        let mut v = Self::with_capacity(visitor.remaining().unwrap_or(0));
-        while let Some(elem) = visitor.visit() {
-            v.push(elem.map_err(Error::Content)?);
-        }
-
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<'b, T, S> Decode<'b> for std::collections::HashSet<T, S>
-where
-    T: Decode<'b> + Eq + std::hash::Hash,
-    S: std::hash::BuildHasher + std::default::Default,
-{
-    type Error = Error<T::Error>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.array_visitor()?;
-        let mut v = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
-        while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(Error::Content)?);
-        }
-
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'b, T> Decode<'b> for alloc::collections::BTreeSet<T>
-where
-    T: Decode<'b> + Ord,
-{
-    type Error = Error<T::Error>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.array_visitor()?;
-        let mut v = Self::new();
-        while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(Error::Content)?);
-        }
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "alloc")]
 macro_rules! decode_sequential {
-    ($($t:ty, $push:ident, $new:ident $($default:literal)?)*) => {
+    ($($t:ty: $($bound:path)* $([$($other_bounds:tt)*])?, $push:ident, $new:ident $(($default:literal $(,$arg:expr)?))?);*) => {
         $(
-            impl<'b, T: Decode<'b>> Decode<'b> for $t {
+            impl<'b, T: Decode<'b> $(+ $bound)*, $($($other_bounds)*)?> Decode<'b> for $t {
                 type Error = Error<T::Error>;
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+                    #[allow(unused)]
+                    let max_alloc = d.0.len() / core::mem::size_of::<T>();
                     let mut visitor = d.array_visitor()?;
-                    let mut v = Self::$new($(visitor.remaining().unwrap_or($default))?);
+                    let mut v = Self::$new($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {
-                        v.$push(x.map_err(Error::Content)?)
+                        v.$push(x.map_err(Error::Content)?);
                     }
                     Ok(v)
                 }
@@ -144,9 +92,11 @@ macro_rules! decode_sequential {
 
 #[cfg(feature = "alloc")]
 decode_sequential! {
-    alloc::vec::Vec<T>, push, with_capacity 0
-    alloc::collections::VecDeque<T>, push_back, with_capacity 0
-    alloc::collections::LinkedList<T>, push_back, new
+    alloc::vec::Vec<T>:, push, with_capacity(0);
+    alloc::collections::VecDeque<T>:, push_back, with_capacity(0);
+    alloc::collections::LinkedList<T>:, push_back, new;
+    alloc::collections::BTreeSet<T>: Ord, insert, new;
+    alloc::collections::BinaryHeap<T>: Ord, push, with_capacity(0)
 }
 
 #[cfg(feature = "alloc")]
@@ -156,6 +106,12 @@ impl<'b, T: Decode<'b>> Decode<'b> for alloc::boxed::Box<[T]> {
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         Vec::<T>::decode(d).map(|v| v.into_boxed_slice())
     }
+}
+
+#[cfg(feature = "std")]
+decode_sequential! {
+    std::collections::HashSet<T, S>: Eq std::hash::Hash [S: std::hash::BuildHasher + std::default::Default],
+    insert, with_capacity_and_hasher(0, S::default())
 }
 
 macro_rules! encode_sequential {

@@ -55,8 +55,12 @@ where
     type Error = super::Error<Error<K::Error, V::Error>>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+        let max_alloc = d.0.len() / std::mem::size_of::<(K, V)>();
         let mut visitor = d.map_visitor()?;
-        let mut m = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
+        let mut m = Self::with_capacity_and_hasher(
+            visitor.remaining().unwrap_or(0).min(max_alloc),
+            S::default(),
+        );
         while let Some(pair) = visitor.visit() {
             let (k, v) = pair.map_err(super::Error::Content)?;
             m.insert(k, v);
@@ -119,74 +123,19 @@ encode_map! {
 }
 
 #[cfg(feature = "alloc")]
-impl<'b, K, V> Decode<'b> for alloc::collections::BinaryHeap<(K, V)>
-where
-    K: Decode<'b> + Ord,
-    V: Decode<'b> + Ord,
-{
-    type Error = super::Error<Error<K::Error, V::Error>>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.map_visitor()?;
-        let mut v = Self::with_capacity(visitor.remaining().unwrap_or(0));
-        while let Some(elem) = visitor.visit() {
-            v.push(elem.map_err(super::Error::Content)?);
-        }
-
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<'b, K, V, S> Decode<'b> for std::collections::HashSet<(K, V), S>
-where
-    K: Decode<'b> + Eq + std::hash::Hash,
-    V: Decode<'b> + Eq + std::hash::Hash,
-    S: std::hash::BuildHasher + std::default::Default,
-{
-    type Error = super::Error<Error<K::Error, V::Error>>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.map_visitor()?;
-        let mut v = Self::with_capacity_and_hasher(visitor.remaining().unwrap_or(0), S::default());
-        while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(super::Error::Content)?);
-        }
-
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'b, K, V> Decode<'b> for alloc::collections::BTreeSet<(K, V)>
-where
-    K: Decode<'b> + Ord,
-    V: Decode<'b> + Ord,
-{
-    type Error = super::Error<Error<K::Error, V::Error>>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut visitor = d.map_visitor()?;
-        let mut v = Self::new();
-        while let Some(elem) = visitor.visit() {
-            v.insert(elem.map_err(super::Error::Content)?);
-        }
-        Ok(v)
-    }
-}
-
-#[cfg(feature = "alloc")]
 macro_rules! decode_sequential {
-    ($($t:ty, $push:ident, $new:ident $($default:literal)? )*) => {
+    ($($t:ty: $($bound:path)* $([$($other_bounds:tt)*])?, $push:ident, $new:ident $(($default:literal $(,$arg:expr)?))? );*) => {
         $(
-            impl<'b, K: Decode<'b>, V: Decode<'b>> Decode<'b> for $t {
+            impl<'b, K: Decode<'b> $(+ $bound)*, V: Decode<'b> $(+ $bound)*, $($($other_bounds)*)?> Decode<'b> for $t {
                 type Error = super::Error<Error<K::Error, V::Error>>;
 
                 fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
+                    #[allow(unused)]
+                    let max_alloc = d.0.len() / core::mem::size_of::<(K, V)>();
                     let mut visitor = d.map_visitor()?;
-                    let mut v = Self::$new ($(visitor.remaining().unwrap_or($default))?);
+                    let mut v = Self::$new ($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {
-                        v.$push(x.map_err(super::Error::Content)?)
+                        v.$push(x.map_err(super::Error::Content)?);
                     }
                     Ok(v)
                 }
@@ -197,9 +146,11 @@ macro_rules! decode_sequential {
 
 #[cfg(feature = "alloc")]
 decode_sequential! {
-    alloc::vec::Vec<(K, V)>, push, with_capacity 0
-    alloc::collections::VecDeque<(K, V)>, push_back, with_capacity 0
-    alloc::collections::LinkedList<(K, V)>, push_back, new
+    alloc::vec::Vec<(K, V)>:, push, with_capacity(0);
+    alloc::collections::VecDeque<(K, V)>:, push_back, with_capacity(0);
+    alloc::collections::LinkedList<(K, V)>:, push_back, new;
+    alloc::collections::BTreeSet<(K, V)>: Ord, insert, new;
+    alloc::collections::BinaryHeap<(K, V)>: Ord, push, with_capacity(0)
 }
 
 #[cfg(feature = "alloc")]
@@ -209,6 +160,12 @@ impl<'b, K: Decode<'b>, V: Decode<'b>> Decode<'b> for alloc::boxed::Box<[(K, V)]
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
         Vec::<(K, V)>::decode(d).map(|v| v.into_boxed_slice())
     }
+}
+
+#[cfg(feature = "std")]
+decode_sequential! {
+    std::collections::HashSet<(K, V), S>: Eq std::hash::Hash [S: std::hash::BuildHasher + std::default::Default],
+    insert, with_capacity_and_hasher(0, S::default())
 }
 
 macro_rules! encode_sequential {
