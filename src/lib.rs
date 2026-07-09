@@ -23,7 +23,7 @@
 //! maximum size. [`Decode`] implementations from this crate only allocate memory proportional to
 //! the size of the input. For example, the `Vec<T>` implementation pre-allocates the vector with
 //! then length provided in the CBOR input when available, limits this initial allocation by
-//! `input.len() / size_of::<T>()`.
+//! `input.len() / size_of::<T>().max(1)`.
 //!
 //! # Feature flags
 //!
@@ -830,12 +830,7 @@ impl<'b> MapVisitor<'_, 'b> {
     {
         match self.state {
             State::Indef(false) => {
-                let key = K::decode(self.decoder);
-                if let Ok(BREAK) = self.decoder.peek() {
-                    self.decoder.read().expect("was peeked");
-                    self.state = State::Indef(true);
-                }
-                match key {
+                match K::decode(self.decoder) {
                     Ok(k) => {
                         let value = f(k, self.decoder);
                         if let Ok(BREAK) = self.decoder.peek() {
