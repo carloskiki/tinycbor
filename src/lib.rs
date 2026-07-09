@@ -17,6 +17,14 @@
 //! [serde]: https://serde.rs
 //! [`tinycbor-derive`]: https://docs.rs/tinycbor-derive
 //!
+//! # Untrusted Inputs
+//!
+//! This crate is designed with untrusted inputs in mind, but does not bound allocations to a fixed
+//! maximum size. [`Decode`] implementations from this crate only allocate memory proportional to
+//! the size of the input. For example, the `Vec<T>` implementation pre-allocates the vector with
+//! then length provided in the CBOR input when available, limits this initial allocation by
+//! `input.len() / size_of::<T>()`.
+//!
 //! # Feature flags
 //!
 //! - `alloc`: Enables support for types in the `alloc` crate, such as `Vec`, `Box`, `Cow`, etc.
