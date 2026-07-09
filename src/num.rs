@@ -226,8 +226,8 @@ impl From<u8> for U8 {
     }
 }
 
-impl From<&u8> for &U8 {
-    fn from(u: &u8) -> Self {
+impl<'a> From<&'a u8> for &'a U8 {
+    fn from(u: &'a u8) -> Self {
         // Safety: U8 is #[repr(transparent)] over u8
         unsafe { &*(u as *const u8 as *const U8) }
     }
@@ -256,6 +256,19 @@ impl AsMut<U8> for u8 {
     fn as_mut(&mut self) -> &mut U8 {
         // Safety: U8 is #[repr(transparent)] over u8
         unsafe { &mut *(self as *mut u8 as *mut U8) }
+    }
+}
+
+impl core::ops::Deref for U8 {
+    type Target = u8;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl core::ops::DerefMut for U8 {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
