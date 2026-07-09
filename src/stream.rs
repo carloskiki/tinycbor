@@ -55,9 +55,9 @@ impl Any {
                 Token::BeginBytes => self.stack.push(Frame::IndefBytes),
                 Token::BeginString => self.stack.push(Frame::IndefString),
                 Token::BeginArray => self.stack.push(Frame::IndefArray),
-                Token::BeginMap => self.stack.push(Frame::IndefMap),
+                Token::BeginMap => self.stack.push(Frame::IndefMap(true)),
 
-                Token::Break if !matches!(top(&self.stack), Frame::Count(_)) => {
+                Token::Break if !matches!(top(&self.stack), Frame::Count(_) | Frame::IndefMap(false)) => {
                     self.stack.pop();
                 }
                 Token::Break => return Err(InvalidHeader.into()),
@@ -71,16 +71,20 @@ impl Any {
                 match self.stack.last_mut() {
                     Some(Frame::Count(0)) => {
                         self.stack.pop();
-                    }
-                    Some(Frame::Count(n)) => {
-                        *n -= 1;
-                        break;
+                        continue;
                     }
                     None => {
                         return Ok(());
                     }
-                    _ => break,
+                    Some(Frame::Count(n)) => {
+                        *n -= 1;
+                    }
+                    Some(Frame::IndefMap(even)) => {
+                        *even = !*even;
+                    }
+                    _ => {},
                 }
+                break;
             }
         }
     }
@@ -97,7 +101,7 @@ impl Any {
 enum Frame {
     Count(usize),
     IndefArray,
-    IndefMap,
+    IndefMap(bool),
     IndefBytes,
     IndefString,
 }
