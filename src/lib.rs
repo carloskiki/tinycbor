@@ -373,20 +373,16 @@ impl<'b> Decoder<'b> {
 
     /// Consume and return *n* bytes starting at the current position.
     fn read_slice(&mut self, n: usize) -> Result<&'b [u8], EndOfInput> {
-        if let Some(b) = self.0.get(..n) {
-            self.0 = &self.0[n..];
-            return Ok(b);
-        }
-        Err(EndOfInput)
+        let (slice, rest) = self.0.split_at_checked(n).ok_or(EndOfInput)?;
+        self.0 = rest;
+        Ok(slice)
     }
 
     /// Consume and return *N* bytes starting at the current position.
     fn read_array<const N: usize>(&mut self) -> Result<[u8; N], EndOfInput> {
-        self.read_slice(N).map(|slice| {
-            let mut a = [0; N];
-            a.copy_from_slice(slice);
-            a
-        })
+        let (array, rest) = self.0.split_first_chunk().ok_or(EndOfInput)?;
+        self.0 = rest;
+        Ok(*array)
     }
 }
 
@@ -829,19 +825,17 @@ impl<'b> MapVisitor<'_, 'b> {
         F: FnOnce(K, &mut Decoder<'b>) -> O,
     {
         match self.state {
-            State::Indef(false) => {
-                match K::decode(self.decoder) {
-                    Ok(k) => {
-                        let value = f(k, self.decoder);
-                        if let Ok(BREAK) = self.decoder.peek() {
-                            self.decoder.read().expect("was peeked");
-                            self.state = State::Indef(true);
-                        }
-                        Some(Ok(value))
+            State::Indef(false) => match K::decode(self.decoder) {
+                Ok(k) => {
+                    let value = f(k, self.decoder);
+                    if let Ok(BREAK) = self.decoder.peek() {
+                        self.decoder.read().expect("was peeked");
+                        self.state = State::Indef(true);
                     }
-                    Err(e) => Some(Err(e)),
+                    Some(Ok(value))
                 }
-            }
+                Err(e) => Some(Err(e)),
+            },
             State::Indef(true) | State::Def(0) => None,
             State::Def(n) => {
                 self.state = State::Def(n - 1);

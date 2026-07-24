@@ -16,96 +16,60 @@ use alloc::{vec, vec::Vec};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Any {
     stack: Vec<Frame>,
-    pending: Vec<u8>,
 }
 
 impl Default for Any {
     fn default() -> Self {
         Self {
             stack: vec![Frame::Count(0)],
-            pending: Vec::new(),
         }
     }
 }
 
 impl Any {
-    fn token(
-        &mut self,
-        chunk: &mut Decoder<'_>,
-    ) -> Result<StreamToken, container::Error<InvalidUtf8>> {
-        if self.pending.is_empty() {
-            let bytes = chunk.0;
-            return match Token::decode(chunk) {
-                Ok(token) => Ok(token.into()),
-                Err(error @ container::Error::Malformed(crate::primitive::Error::EndOfInput)) => {
-                    self.pending.extend_from_slice(bytes);
-                    chunk.0 = &[];
-                    Err(error)
-                }
-                Err(error) => Err(error),
-            };
-        }
-
-        let pending_len = self.pending.len();
-        let incoming = chunk.0;
-        self.pending.extend_from_slice(incoming);
-        let mut decoder = Decoder(&self.pending);
-        match Token::decode(&mut decoder) {
-            Ok(token) => {
-                let token = token.into();
-                let consumed = self.pending.len() - decoder.0.len();
-                let incoming_consumed = consumed
-                    .checked_sub(pending_len)
-                    .expect("incomplete token must consume its buffered prefix");
-                chunk.0 = &incoming[incoming_consumed..];
-                self.pending.clear();
-                Ok(token)
-            }
-            Err(error) => {
-                chunk.0 = &[];
-                Err(error)
-            }
-        }
-    }
-
     /// Ingest a chunk of data.
     ///
     /// If the chunk completes a full CBOR item, returns `Ok(())` and the remaining unprocessed data is
-    /// left in the chunk. Otherwise, returns [`crate::primitive::Error::EndOfInput`] (wrapped in
-    /// [`crate::container::Error::Malformed`]) to indicate that more data is needed. Any other error
-    /// variant indicates a malformed input.
+    /// left in the chunk. Otherwise, returns [`primitive::Error::EndOfInput`](crate::primitive::Error::EndOfInput)
+    /// (wrapped in [`container::Error::Malformed`]) to indicate that more data is needed. Any
+    /// primitive that is not parsed fully (e.g, a multi-byte integer missing its last byte) is
+    /// left in the chunk and should be fed again with the next chunk of data.
+    ///
+    /// Any other error variant indicates a malformed input.
     pub fn feed(&mut self, chunk: &mut Decoder<'_>) -> Result<(), container::Error<InvalidUtf8>> {
         fn top(stack: &[Frame]) -> &Frame {
             stack.last().expect("stack is non-empty")
         }
 
+        let mut working_copy = *chunk;
         loop {
-            let token = self.token(chunk)?;
+            *chunk = working_copy;
+            let token = Token::decode(&mut working_copy)?;
             if (matches!(top(&self.stack), Frame::IndefBytes)
-                && !matches!(token, StreamToken::Bytes | StreamToken::Break))
+                && !matches!(token, Token::Bytes(_) | Token::Break))
                 || (matches!(top(&self.stack), Frame::IndefString)
-                    && !matches!(token, StreamToken::String | StreamToken::Break))
+                    && !matches!(token, Token::String(_) | Token::Break))
             {
                 return Err(InvalidHeader.into());
             }
 
             match token {
-                StreamToken::Array(count) => self.stack.push(Frame::Count(count)),
-                StreamToken::Map(count) => self.stack.push(Frame::Count(count.saturating_mul(2))),
+                Token::Array(count) => self.stack.push(Frame::Count(count)),
+                Token::Map(count) => self.stack.push(Frame::Count(count.saturating_mul(2))),
 
-                StreamToken::BeginBytes => self.stack.push(Frame::IndefBytes),
-                StreamToken::BeginString => self.stack.push(Frame::IndefString),
-                StreamToken::BeginArray => self.stack.push(Frame::IndefArray),
-                StreamToken::BeginMap => self.stack.push(Frame::IndefMap(false)),
+                Token::BeginBytes => self.stack.push(Frame::IndefBytes),
+                Token::BeginString => self.stack.push(Frame::IndefString),
+                Token::BeginArray => self.stack.push(Frame::IndefArray),
+                Token::BeginMap => self.stack.push(Frame::IndefMap(false)),
 
-                StreamToken::Break
+                Token::Break
                     if !matches!(top(&self.stack), Frame::Count(_) | Frame::IndefMap(false)) =>
                 {
                     self.stack.pop();
                 }
-                StreamToken::Break => return Err(InvalidHeader.into()),
+                Token::Break => return Err(InvalidHeader.into()),
 
-                StreamToken::Tag => continue,
+                Token::Tag(_) => continue,
 
                 _ => {}
             }
@@ -136,40 +100,6 @@ impl Any {
     pub fn reset(&mut self) {
         self.stack.clear();
         self.stack.push(Frame::Count(0));
-        self.pending.clear();
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StreamToken {
-    Array(usize),
-    Map(usize),
-    BeginBytes,
-    BeginString,
-    BeginArray,
-    BeginMap,
-    Bytes,
-    String,
-    Tag,
-    Break,
-    Item,
-}
-
-impl From<Token<'_>> for StreamToken {
-    fn from(token: Token<'_>) -> Self {
-        match token {
-            Token::Array(count) => StreamToken::Array(count),
-            Token::Map(count) => StreamToken::Map(count),
-            Token::BeginBytes => StreamToken::BeginBytes,
-            Token::BeginString => StreamToken::BeginString,
-            Token::BeginArray => StreamToken::BeginArray,
-            Token::BeginMap => StreamToken::BeginMap,
-            Token::Bytes(_) => StreamToken::Bytes,
-            Token::String(_) => StreamToken::String,
-            Token::Tag(_) => StreamToken::Tag,
-            Token::Break => StreamToken::Break,
-            _ => StreamToken::Item,
-        }
     }
 }
 
@@ -201,19 +131,5 @@ mod tests {
         let mut d = Decoder(&[0x02, 0x03, 0xff]);
         any.feed(&mut d).unwrap();
         assert_eq!(d.0, &[0xff]);
-    }
-
-    #[test]
-    fn fragmented_scalar_argument() {
-        let mut any = Any::default();
-        let result = any.feed(&mut Decoder(&[0x18]));
-        assert!(matches!(
-            result,
-            Err(container::Error::Malformed(primitive::Error::EndOfInput))
-        ));
-
-        let mut d = Decoder(&[0xff, 0x00]);
-        any.feed(&mut d).unwrap();
-        assert_eq!(d.0, &[0x00]);
     }
 }
