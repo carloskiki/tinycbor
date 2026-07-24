@@ -55,7 +55,7 @@ impl core::error::Error for Error {
 /// CBOR integers keep the sign bit in the major type so there is one extra bit
 /// available for signed numbers compared to Rust's integer types. This type can
 /// be used to encode and decode the full CBOR integer range.
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Int {
     /// `true` if the integer is negative.
     pub negative: bool,
@@ -64,6 +64,23 @@ pub struct Int {
     /// This is the value of the integer for positive integers, and the absolute value minus one
     /// for negative integers.
     pub bits: u64,
+}
+
+impl core::cmp::Ord for Int {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        match (self.negative, other.negative) {
+            (true, false) => core::cmp::Ordering::Less,
+            (false, true) => core::cmp::Ordering::Greater,
+            (true, true) => other.bits.cmp(&self.bits),
+            (false, false) => self.bits.cmp(&other.bits),
+        }
+    }
+}
+
+impl core::cmp::PartialOrd for Int {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl core::fmt::Display for Int {
@@ -805,6 +822,31 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn int_uses_numeric_ordering() {
+        let values = [
+            Int {
+                negative: true,
+                bits: 1,
+            },
+            Int {
+                negative: true,
+                bits: 0,
+            },
+            Int {
+                negative: false,
+                bits: 0,
+            },
+            Int {
+                negative: false,
+                bits: 1,
+            },
+        ];
+
+        assert!(values.is_sorted());
+        assert_eq!(values.map(i128::from), [-2, -1, 0, 1]);
     }
 
     #[test]
