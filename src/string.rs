@@ -93,7 +93,7 @@ impl<'a> Decode<'a> for alloc::boxed::Box<str> {
 
 /// Decodes a definite-length string as a `&Path`.
 ///
-/// If you need to also support indefinite-length byte strings, consider using an allocated type
+/// If you need to also support indefinite-length text strings, consider using an allocated type
 /// such as `PathBuf` or `Box<Path>`.
 #[cfg(feature = "std")]
 impl<'b> Decode<'b> for &'b std::path::Path {
@@ -118,7 +118,7 @@ impl<'b> Decode<'b> for std::path::PathBuf {
     type Error = container::Error<InvalidUtf8>;
 
     fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        <&'b std::path::Path>::decode(d).map(std::path::Path::to_path_buf)
+        alloc::string::String::decode(d).map(std::path::PathBuf::from)
     }
 }
 
@@ -235,6 +235,23 @@ mod tests {
         assert_eq!(
             Box::<Path>::decode(&mut Decoder(&cbor)).unwrap(),
             PathBuf::from(result).into_boxed_path()
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn indefinite_path() {
+        use crate::{Decode, Decoder};
+        use std::path::{Path, PathBuf};
+
+        let cbor = [0x7f, 0x61, b'a', 0xff];
+        assert_eq!(
+            PathBuf::decode(&mut Decoder(&cbor)).unwrap(),
+            PathBuf::from("a")
+        );
+        assert_eq!(
+            Box::<Path>::decode(&mut Decoder(&cbor)).unwrap(),
+            PathBuf::from("a").into_boxed_path()
         );
     }
 }
