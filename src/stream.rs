@@ -55,9 +55,11 @@ impl Any {
                 Token::BeginBytes => self.stack.push(Frame::IndefBytes),
                 Token::BeginString => self.stack.push(Frame::IndefString),
                 Token::BeginArray => self.stack.push(Frame::IndefArray),
-                Token::BeginMap => self.stack.push(Frame::IndefMap(true)),
+                Token::BeginMap => self.stack.push(Frame::IndefMap(false)),
 
-                Token::Break if !matches!(top(&self.stack), Frame::Count(_) | Frame::IndefMap(false)) => {
+                Token::Break
+                    if !matches!(top(&self.stack), Frame::Count(_) | Frame::IndefMap(false)) =>
+                {
                     self.stack.pop();
                 }
                 Token::Break => return Err(InvalidHeader.into()),
@@ -82,7 +84,7 @@ impl Any {
                     Some(Frame::IndefMap(even)) => {
                         *even = !*even;
                     }
-                    _ => {},
+                    _ => {}
                 }
                 break;
             }
