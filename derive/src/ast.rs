@@ -325,15 +325,21 @@ impl TryFrom<syn::DeriveInput> for Container {
                         "`map` attribute is only applicable to structs",
                     ));
                 } else {
-                    // TODO: uniqueness of tags?
-                    Data::Enum {
-                        variants: data
-                            .variants
-                            .iter()
-                            .map(|v| Variant::parse(v, &input.generics))
-                            .collect::<syn::Result<Vec<_>>>()?,
-                        naked,
+                    let variants = data
+                        .variants
+                        .iter()
+                        .map(|v| Variant::parse(v, &input.generics))
+                        .collect::<syn::Result<Vec<_>>>()?;
+                    let mut existing = HashSet::<u64>::new();
+                    for variant in &variants {
+                        if !existing.insert(variant.tag) {
+                            return Err(syn::Error::new_spanned(
+                                &variant.ident,
+                                format!("Duplicate variant tag: {}", variant.tag),
+                            ));
+                        }
                     }
+                    Data::Enum { variants, naked }
                 }
             }
             syn::Data::Union(_) => {
@@ -1049,5 +1055,27 @@ fn is_default() -> TokenStream {
         fn __is_default<T: ::core::default::Default + ::core::cmp::PartialEq>(value: &T) -> bool {
             value == &T::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Container;
+
+    #[test]
+    fn rejects_duplicate_variant_tags() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            enum DuplicateTags {
+                #[n(0)]
+                A,
+                #[n(0)]
+                B,
+            }
+        };
+
+        let error = Container::try_from(input)
+            .err()
+            .expect("derive should fail");
+        assert_eq!(error.to_string(), "Duplicate variant tag: 0");
     }
 }
