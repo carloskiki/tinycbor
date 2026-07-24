@@ -81,6 +81,7 @@ impl Any {
                         continue;
                     }
                     None => {
+                        *chunk = working_copy;
                         return Ok(());
                     }
                     Some(Frame::Count(n)) => {
