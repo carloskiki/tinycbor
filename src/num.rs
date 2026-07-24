@@ -584,10 +584,11 @@ const fn f32_to_f16(value: f32) -> (u16, bool) {
     if exp == 0x7F80_0000u32 {
         // Set mantissa MSB for NaN (and also keep shifted mantissa bits)
         let nan_bit = if man == 0 { 0 } else { 0x0200u32 };
-        // Lossless if mantissa is zero (infinity)
+        // Infinities are exact, and all NaN patterns are equivalent because
+        // NaN payloads are intentionally not preserved.
         return (
             ((sign >> 16) | 0x7C00u32 | nan_bit | (man >> 13)) as u16,
-            man == 0,
+            true,
         );
     }
 
@@ -643,6 +644,10 @@ const fn f32_to_f16(value: f32) -> (u16, bool) {
     }
 }
 
+/// This implementation accepts 16-bit and 32-bit floating point numbers. It also accepts 64-bit
+/// floating point numbers when they can be losslessly narrowed to 32-bit floating point numbers.
+///
+/// Exact `NaN` bit patterns are not preserved.
 impl Decode<'_> for f32 {
     type Error = Error;
 
@@ -653,7 +658,7 @@ impl Decode<'_> for f32 {
             0xfb => {
                 let double = f64::from_be_bytes(d.read_array()?);
                 let narrowed = double as f32;
-                if narrowed as f64 != double {
+                if !narrowed.is_nan() && narrowed as f64 != double {
                     return Err(Error::Narrowing);
                 }
                 narrowed
@@ -665,6 +670,8 @@ impl Decode<'_> for f32 {
     }
 }
 
+/// This implementation converts values to 16-bit floating point numbers when the conversion
+/// is lossless. As such, it does not preserve exact `NaN` bit patterns.
 impl Encode for f32 {
     fn encode<W: embedded_io::Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
         let (half, lossless) = f32_to_f16(*self);
@@ -687,6 +694,9 @@ impl CborLen for f32 {
     }
 }
 
+/// This implementation accepts 16-bit and 32-bit and 64-bit floating point numbers.
+///
+/// Exact `NaN` bit patterns are not preserved.
 impl Decode<'_> for f64 {
     type Error = primitive::Error;
 
@@ -704,10 +714,12 @@ impl Decode<'_> for f64 {
     }
 }
 
+/// This implementation converts values to 16-bit or 32-bit floating point numbers when the
+/// conversion is lossless. As such, it does not preserve exact `NaN` bit patterns.
 impl Encode for f64 {
     fn encode<W: embedded_io::Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
         let float = *self as f32;
-        if float as f64 != *self {
+        if !float.is_nan() && float as f64 != *self {
             e.put(&[SIMPLE | 27])?;
             return e.put(&self.to_be_bytes()[..]);
         }
@@ -724,7 +736,7 @@ impl Encode for f64 {
 impl CborLen for f64 {
     fn cbor_len(&self) -> usize {
         let float = *self as f32;
-        if float as f64 != *self {
+        if !float.is_nan() && float as f64 != *self {
             9
         } else if let (_, true) = f32_to_f16(float) {
             3
