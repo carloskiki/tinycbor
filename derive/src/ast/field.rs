@@ -358,17 +358,19 @@ struct GenericDetector<'a> {
 
 impl<'a> VisitMut for GenericDetector<'a> {
     fn visit_path_mut(&mut self, i: &mut syn::Path) {
-        // Check if the path is a simple identifier (like `T` or `N`)
-        // and matches one of our generic params.
+        // Check whether the path starts with one of our generic params. In
+        // addition to simple paths like `T`, this must recognize associated
+        // types like `T::Assoc`.
         if i.leading_colon.is_none()
-            && i.segments.len() == 1
             && self.generics.params.iter().any(|param| {
                 let param_ident = match param {
                     syn::GenericParam::Type(t) => &t.ident,
                     syn::GenericParam::Const(c) => &c.ident,
                     syn::GenericParam::Lifetime(_) => return false,
                 };
-                i.segments[0].ident == *param_ident
+                i.segments
+                    .first()
+                    .is_some_and(|segment| segment.ident == *param_ident)
             })
         {
             self.is_generic = true;
