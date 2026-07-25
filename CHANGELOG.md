@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# 0.12.5 - 2026-07-09
+# 0.13.0 (0.15.3-derive) - 2026-07-24
+
+### Fixed
+
+- `Ord` implementation for `Int`.
+- `stream::Any` does not consume partial tokens, and has fixed polarity on indefinite maps. 
+
+### Changed
+
+- Specified `NaN` policy for floats. All `NaN` values are treated as equivalent.
+
+# 0.12.6 - 2026-07-09
 
 ### Fixed
 
