@@ -28,7 +28,7 @@ where
 
 impl Encode for [u8] {
     fn encode<W: Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
-        e.type_len(BYTES, self.len() as u64)?;
+        e.type_len(BYTES, self.len().try_into().expect("bytestring length should be no more than u64::MAX"))?;
         e.put(self)
     }
 }

@@ -68,7 +68,10 @@ impl Variant {
     pub fn encode(self, naked: bool) -> TokenStream {
         let Variant { tag, ident, fields } = self;
         let variant_name = &ident;
-        let field_count = fields.len();
+        let field_count: u64 = fields
+            .len()
+            .try_into()
+            .expect("field count should fit in u64");
 
         let destruct: TokenStream = fields.iter().map(|f| f.destruct()).collect();
         let procedures = fields.into_iter().map(|f| f.encode());
@@ -87,13 +90,16 @@ impl Variant {
     pub fn len(self, naked: bool) -> TokenStream {
         let Variant { tag, ident, fields } = self;
         let variant_name = &ident;
-        let field_count = fields.len();
+        let field_count: u64 = fields
+            .len()
+            .try_into()
+            .expect("field count should fit in u64");
 
         let destructors: TokenStream = fields.iter().map(|f| f.destruct()).collect();
         let field_lens = fields.into_iter().map(|f| f.len());
         let container_len = (!naked).then(|| {
             quote! {
-                total_len += <usize as ::tinycbor::CborLen>::cbor_len(&(#field_count + 1));
+                total_len += <u64 as ::tinycbor::CborLen>::cbor_len(&(#field_count + 1));
             }
         });
         quote! {

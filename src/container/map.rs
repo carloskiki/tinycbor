@@ -45,56 +45,13 @@ where
     }
 }
 
-#[cfg(feature = "std")]
-impl<'b, K, V, S> Decode<'b> for std::collections::HashMap<K, V, S>
-where
-    K: Decode<'b> + Eq + std::hash::Hash,
-    V: Decode<'b>,
-    S: std::hash::BuildHasher + std::default::Default,
-{
-    type Error = super::Error<Error<K::Error, V::Error>>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let max_alloc = d.0.len() / std::mem::size_of::<(K, V)>().max(1);
-        let mut visitor = d.map_visitor()?;
-        let mut m = Self::with_capacity_and_hasher(
-            visitor.remaining().unwrap_or(0).min(max_alloc),
-            S::default(),
-        );
-        while let Some(pair) = visitor.visit() {
-            let (k, v) = pair.map_err(super::Error::Content)?;
-            m.insert(k, v);
-        }
-        Ok(m)
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<'b, K, V> Decode<'b> for alloc::collections::BTreeMap<K, V>
-where
-    K: Decode<'b> + Eq + Ord,
-    V: Decode<'b>,
-{
-    type Error = super::Error<Error<K::Error, V::Error>>;
-
-    fn decode(d: &mut Decoder<'b>) -> Result<Self, Self::Error> {
-        let mut m = Self::new();
-        let mut visitor = d.map_visitor()?;
-        while let Some(pair) = visitor.visit() {
-            let (k, v) = pair.map_err(super::Error::Content)?;
-            m.insert(k, v);
-        }
-        Ok(m)
-    }
-}
-
 #[cfg(feature = "alloc")]
 macro_rules! encode_map {
     ($($t:ty)*) => {
         $(
             impl<K: Encode, V: Encode> Encode for $t {
                 fn encode<W: embedded_io::Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
-                    e.map(self.len())?;
+                    e.map(self.len().try_into().expect("map should contain no more than u64::MAX elements"))?;
                     for (k, v) in self {
                         k.encode(e)?;
                         v.encode(e)?;
@@ -112,19 +69,27 @@ macro_rules! encode_map {
     }
 }
 
+encode_map!([(K, V)]);
+
 #[cfg(feature = "alloc")]
 encode_map! {
     alloc::collections::BTreeMap<K, V>
+    alloc::vec::Vec<(K, V)>
+    alloc::collections::VecDeque<(K, V)>
+    alloc::collections::LinkedList<(K, V)>
+    alloc::collections::BinaryHeap<(K, V)>
+    alloc::collections::BTreeSet<(K, V)>
 }
 
 #[cfg(feature = "std")]
 encode_map! {
     std::collections::HashMap<K, V>
+    std::collections::HashSet<(K, V)>
 }
 
 #[cfg(feature = "alloc")]
-macro_rules! decode_sequential {
-    ($($t:ty: $($bound:path)* $([$($other_bounds:tt)*])?, $push:ident, $new:ident $(($default:literal $(,$arg:expr)?))? );*) => {
+macro_rules! decode_map {
+    ($($t:ty: $($bound:path)* $([$($other_bounds:tt)*])?, $push:ident $(($uncurry:ident))?, $new:ident $(($default:literal $(,$arg:expr)?))? );*) => {
         $(
             impl<'b, K: Decode<'b> $(+ $bound)*, V: Decode<'b> $(+ $bound)*, $($($other_bounds)*)?> Decode<'b> for $t {
                 type Error = super::Error<Error<K::Error, V::Error>>;
@@ -133,23 +98,33 @@ macro_rules! decode_sequential {
                     #[allow(unused)]
                     let max_alloc = d.0.len() / core::mem::size_of::<(K, V)>().max(1);
                     let mut visitor = d.map_visitor()?;
-                    let mut v = Self::$new ($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
+                    let mut v = Self::$new ($(visitor.remaining()
+                        .map(|n| usize::try_from(n).unwrap_or(usize::MAX).min(max_alloc))
+                        .unwrap_or($default) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {
-                        v.$push(x.map_err(super::Error::Content)?);
+                        let (key, value) = x.map_err(super::Error::Content)?;
+                        decode_map!(@push_args v.$push $(($uncurry))? key, value);
                     }
                     Ok(v)
                 }
             }
         )*
+    };
+    (@push_args $container:ident.$push:ident (uncurry) $key:ident, $value:ident) => {
+        $container.$push($key, $value)
+    };
+    (@push_args $container:ident.$push:ident $key:ident, $value:ident) => {
+        $container.$push(($key, $value))
     }
 }
 
 #[cfg(feature = "alloc")]
-decode_sequential! {
+decode_map! {
     alloc::vec::Vec<(K, V)>:, push, with_capacity(0);
     alloc::collections::VecDeque<(K, V)>:, push_back, with_capacity(0);
     alloc::collections::LinkedList<(K, V)>:, push_back, new;
     alloc::collections::BTreeSet<(K, V)>: Ord, insert, new;
+    alloc::collections::BTreeMap<K, V>: Ord, insert (uncurry), new;
     alloc::collections::BinaryHeap<(K, V)>: Ord, push, with_capacity(0)
 }
 
@@ -163,50 +138,12 @@ impl<'b, K: Decode<'b>, V: Decode<'b>> Decode<'b> for alloc::boxed::Box<[(K, V)]
 }
 
 #[cfg(feature = "std")]
-decode_sequential! {
+decode_map! {
     std::collections::HashSet<(K, V), S>: Eq std::hash::Hash [S: std::hash::BuildHasher + std::default::Default],
-    insert, with_capacity_and_hasher(0, S::default())
+    insert, with_capacity_and_hasher(0, S::default());
+    std::collections::HashMap<K, V, S>: Eq std::hash::Hash [S: std::hash::BuildHasher + std::default::Default],
+    insert (uncurry), with_capacity_and_hasher(0, S::default())
 }
-
-macro_rules! encode_sequential {
-    ($($t:ty)*) => {
-        $(
-            impl<K: Encode, V: Encode> Encode for $t {
-                fn encode<W: embedded_io::Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
-                    e.map(self.len())?;
-                    for (k, v) in self {
-                        k.encode(e)?;
-                        v.encode(e)?;
-                    }
-                    Ok(())
-                }
-            }
-
-            impl<K: CborLen, V: CborLen> CborLen for $t {
-                fn cbor_len(&self) -> usize {
-                    let n = self.len();
-                    n.cbor_len() + self.iter().map(|(k, v)| k.cbor_len() + v.cbor_len()).sum::<usize>()
-                }
-            }
-        )*
-    }
-}
-
-#[cfg(feature = "alloc")]
-encode_sequential! {
-    alloc::vec::Vec<(K, V)>
-    alloc::collections::VecDeque<(K, V)>
-    alloc::collections::LinkedList<(K, V)>
-    alloc::collections::BinaryHeap<(K, V)>
-    alloc::collections::BTreeSet<(K, V)>
-}
-
-#[cfg(feature = "std")]
-encode_sequential! {
-    std::collections::HashSet<(K, V)>
-}
-
-encode_sequential!([(K, V)]);
 
 #[cfg(test)]
 mod tests {

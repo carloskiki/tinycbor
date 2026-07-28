@@ -68,7 +68,7 @@ impl<T, const N: usize> Guard<T, N> {
             initialized: 0,
         }
     }
-    
+
     fn try_init<E>(mut self, mut init: impl FnMut(usize) -> Result<T, E>) -> Result<[T; N], E> {
         self.data.iter_mut().enumerate().try_for_each(|(i, elem)| {
             elem.write(init(i)?);
@@ -92,6 +92,11 @@ impl<T, const N: usize> Drop for Guard<T, N> {
             unsafe { self.data[i].assume_init_drop() };
         }
     }
+}
+
+const fn usize_to_u64<const N: usize>() -> u64 {
+    const { assert!(N <= u64::MAX as usize, "array length exceeds u64::MAX") };
+    N as u64
 }
 
 impl<'a, T, const N: usize> Decode<'a> for [T; N]
@@ -119,7 +124,7 @@ where
 
 impl<T: Encode, const N: usize> Encode for [T; N] {
     fn encode<W: embedded_io::Write>(&self, e: &mut crate::Encoder<W>) -> Result<(), W::Error> {
-        e.array(N)?;
+        e.array(usize_to_u64::<N>())?;
         for item in self {
             item.encode(e)?;
         }
@@ -160,7 +165,7 @@ where
 
 impl<K: Encode, V: Encode, const N: usize> Encode for [(K, V); N] {
     fn encode<W: embedded_io::Write>(&self, e: &mut crate::Encoder<W>) -> Result<(), W::Error> {
-        e.map(N)?;
+        e.map(usize_to_u64::<N>())?;
         for (k, v) in self {
             k.encode(e)?;
             v.encode(e)?;

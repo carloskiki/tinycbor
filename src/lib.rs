@@ -49,15 +49,6 @@
 #![doc = include_str!("../DESIGN.md")]
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
 
-// To support targets with 128 bit pointers, we would need to handle containers having lengths
-// larger than supported by the CBOR format. We don't want to deal with that right now.
-#[cfg(not(any(
-    target_pointer_width = "16",
-    target_pointer_width = "32",
-    target_pointer_width = "64"
-)))]
-compile_error!("only targets with 16, 32 or 64 bit pointer width are supported");
-
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
@@ -130,8 +121,8 @@ pub struct Encoder<W>(pub W);
 
 impl<W: Write> Encoder<W> {
     /// Begin encoding an array with `len` elements.
-    pub fn array(&mut self, len: usize) -> Result<(), W::Error> {
-        self.type_len(ARRAY, len as u64)
+    pub fn array(&mut self, len: u64) -> Result<(), W::Error> {
+        self.type_len(ARRAY, len)
     }
 
     /// Begin encoding an array of unknown size.
@@ -142,8 +133,8 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Begin encoding a map with `len` entries.
-    pub fn map(&mut self, len: usize) -> Result<(), W::Error> {
-        self.type_len(MAP, len as u64)
+    pub fn map(&mut self, len: u64) -> Result<(), W::Error> {
+        self.type_len(MAP, len)
     }
 
     /// Begin encoding a map of unknown size.
@@ -351,10 +342,9 @@ impl<'b> Decoder<'b> {
         }?)
     }
 
-    /// Decode an unsigned length from the decoder. converting from u64 to usize is fine when it is
-    /// a length because lengths larger than usize::MAX cannot be represented in memory anyway.
-    fn length(&mut self) -> Result<usize, primitive::Error> {
-        Ok(self.unsigned()?.try_into().unwrap_or(usize::MAX))
+    /// Decode an unsigned length from the decoder.
+    fn length(&mut self) -> Result<u64, primitive::Error> {
+        self.unsigned()
     }
 
     /// Consume and return the byte at the current position.
@@ -372,7 +362,8 @@ impl<'b> Decoder<'b> {
     }
 
     /// Consume and return *n* bytes starting at the current position.
-    fn read_slice(&mut self, n: usize) -> Result<&'b [u8], EndOfInput> {
+    fn read_slice(&mut self, n: u64) -> Result<&'b [u8], EndOfInput> {
+        let n = usize::try_from(n).map_err(|_| EndOfInput)?;
         let (slice, rest) = self.0.split_at_checked(n).ok_or(EndOfInput)?;
         self.0 = rest;
         Ok(slice)
@@ -436,14 +427,14 @@ impl core::fmt::Display for Decoder<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         /// Control stack element.
         enum E {
-            N(bool),          // get next token (true => token is required)
-            T,                // tag
-            A(Option<usize>), // array
-            M(Option<usize>), // map
-            B,                // indefinite bytes
-            D,                // indefinite text
-            S(&'static str),  // display string
-            X(&'static str),  // display string (unless next token is BREAK)
+            N(bool),         // get next token (true => token is required)
+            T,               // tag
+            A(Option<u64>),  // array
+            M(Option<u64>),  // map
+            B,               // indefinite bytes
+            D,               // indefinite text
+            S(&'static str), // display string
+            X(&'static str), // display string (unless next token is BREAK)
         }
 
         let mut iter = self.peekable();
@@ -648,13 +639,13 @@ fn info_of(b: u8) -> u8 {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum State {
     /// Definite length.
-    Def(usize),
+    Def(u64),
     /// Indefinite length. Stores whether the end has been reached.
     Indef(bool),
 }
 
-impl From<Option<usize>> for State {
-    fn from(val: Option<usize>) -> Self {
+impl From<Option<u64>> for State {
+    fn from(val: Option<u64>) -> Self {
         if let Some(n) = val {
             Self::Def(n)
         } else {
@@ -664,7 +655,7 @@ impl From<Option<usize>> for State {
 }
 
 impl State {
-    fn remaining(&self) -> Option<usize> {
+    fn remaining(&self) -> Option<u64> {
         match self {
             State::Def(n) => Some(*n),
             State::Indef(done) => done.then_some(0),
@@ -787,7 +778,7 @@ impl<'b> ArrayVisitor<'_, 'b> {
         }
     }
 
-    pub fn remaining(&self) -> Option<usize> {
+    pub fn remaining(&self) -> Option<u64> {
         self.state.remaining()
     }
 
@@ -848,7 +839,7 @@ impl<'b> MapVisitor<'_, 'b> {
         }
     }
 
-    pub fn remaining(&self) -> Option<usize> {
+    pub fn remaining(&self) -> Option<u64> {
         self.state.remaining()
     }
 
@@ -911,8 +902,8 @@ pub enum Token<'b> {
     Float(f64),
     Bytes(&'b [u8]),
     String(&'b str),
-    Array(usize),
-    Map(usize),
+    Array(u64),
+    Map(u64),
     Tag(u64),
     Simple(primitive::Simple),
     Break,

@@ -107,7 +107,7 @@ impl Any {
 /// Stack frame of the streaming decoder.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Frame {
-    Count(usize),
+    Count(u64),
     IndefArray,
     IndefMap(bool),
     IndefBytes,

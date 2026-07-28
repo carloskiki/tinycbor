@@ -79,7 +79,9 @@ macro_rules! decode_sequential {
                     #[allow(unused)]
                     let max_alloc = d.0.len() / core::mem::size_of::<T>().max(1);
                     let mut visitor = d.array_visitor()?;
-                    let mut v = Self::$new($(visitor.remaining().unwrap_or($default).min(max_alloc) $(, $arg)?)?);
+                    let mut v = Self::$new($(visitor.remaining()
+                        .map(|n| usize::try_from(n).unwrap_or(usize::MAX).min(max_alloc))
+                        .unwrap_or($default) $(, $arg)?)?);
                     while let Some(x) = visitor.visit() {
                         v.$push(x.map_err(Error::Content)?);
                     }
@@ -119,7 +121,7 @@ macro_rules! encode_sequential {
         $(
             impl<T: Encode> Encode for $t {
                 fn encode<W: embedded_io::Write>(&self, e: &mut Encoder<W>) -> Result<(), W::Error> {
-                    e.array(self.len())?;
+                    e.array(self.len().try_into().expect("array should have no more than u64::MAX elements"))?;
                     for x in self {
                         x.encode(e)?
                     }
@@ -129,8 +131,7 @@ macro_rules! encode_sequential {
 
             impl<T: CborLen> CborLen for $t {
                 fn cbor_len(&self) -> usize {
-                    let n = self.len();
-                    n.cbor_len() + self.iter().map(|x| x.cbor_len()).sum::<usize>()
+                    self.len().cbor_len() + self.iter().map(|x| x.cbor_len()).sum::<usize>()
                 }
             }
         )*

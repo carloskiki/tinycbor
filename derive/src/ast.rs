@@ -806,7 +806,10 @@ impl Data {
     pub fn encode(self) -> TokenStream {
         match self {
             Data::Array { fields, naked } => {
-                let field_count = fields.len();
+                let field_count: u64 = fields
+                    .len()
+                    .try_into()
+                    .expect("field count should fit in u64");
                 let destruct: TokenStream = fields.iter().map(|f| f.destruct()).collect();
                 let procedures = fields.into_iter().map(|f| f.encode());
                 let container = (!naked).then(|| {
@@ -823,7 +826,12 @@ impl Data {
                 }
             }
             Data::Map(map_fields) => {
-                let field_count_min = map_fields.iter().filter(|f| !f.optional).count();
+                let field_count_min: u64 = map_fields
+                    .iter()
+                    .filter(|f| !f.optional)
+                    .count()
+                    .try_into()
+                    .expect("field count should fit in u64");
                 let field_count_opt = map_fields.iter().filter_map(|f| {
                     let variable = f.field.variable();
                     if f.optional {
@@ -884,12 +892,15 @@ impl Data {
     pub fn len(self) -> TokenStream {
         match self {
             Data::Array { fields, naked } => {
-                let field_count = fields.len();
+                let field_count: u64 = fields
+                    .len()
+                    .try_into()
+                    .expect("field count should fit in u64");
                 let destructure: TokenStream = fields.iter().map(|f| f.destruct()).collect();
                 let procedures = fields.into_iter().map(|f| f.len());
                 let container = (!naked).then(|| {
                     quote! {
-                        <usize as ::tinycbor::CborLen>::cbor_len(&#field_count) +
+                        <u64 as ::tinycbor::CborLen>::cbor_len(&#field_count) +
                     }
                 });
                 quote! {
@@ -900,7 +911,12 @@ impl Data {
                 }
             }
             Data::Map(map_fields) => {
-                let field_count_min = map_fields.iter().filter(|f| !f.optional).count();
+                let field_count_min: u64 = map_fields
+                    .iter()
+                    .filter(|f| !f.optional)
+                    .count()
+                    .try_into()
+                    .expect("field count should fit in u64");
                 let destruct: TokenStream = map_fields.iter().map(|f| f.field.destruct()).collect();
                 let procedures = map_fields.into_iter().map(|f| {
                     let index = f.index;
@@ -927,7 +943,7 @@ impl Data {
                         let mut count = #field_count_min;
 
                         #((#procedures) + )*
-                        <usize as ::tinycbor::CborLen>::cbor_len(&count)
+                        <u64 as ::tinycbor::CborLen>::cbor_len(&count)
                     }
                 }
             }
