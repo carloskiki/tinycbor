@@ -1127,6 +1127,91 @@ impl<'b, T: Decode<'b>> Decode<'b> for Encoded<T> {
     }
 }
 
+/// A value that memoizes its encoded bytes.
+///
+/// This allows `Encode` and `CborLen` to re-use the original encoded bytes instead of re-encoding.
+#[derive(Debug, Clone, Copy, Default, Hash)]
+pub struct Memo<'a, T> {
+    bytes: Option<&'a [u8]>,
+    value: T,
+}
+
+impl<T> Memo<'_, T> {
+    /// Unwrap the value.
+    pub fn value(self) -> T {
+        self.value
+    }
+}
+
+impl<T> AsRef<T> for Memo<'_, T> {
+    fn as_ref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<'a, T> From<T> for Memo<'a, T> {
+    fn from(value: T) -> Self {
+        Memo { value, bytes: None }
+    }
+}
+
+impl<T: Eq> Eq for Memo<'_, T> {}
+
+impl<T: PartialEq> PartialEq for Memo<'_, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<T: PartialEq> PartialEq<T> for Memo<'_, T> {
+    fn eq(&self, other: &T) -> bool {
+        &self.value == other
+    }
+}
+
+impl<T> Encode for Memo<'_, T>
+where
+    T: Encode,
+{
+    fn encode<W: embedded_io::Write>(&self, e: &mut crate::Encoder<W>) -> Result<(), W::Error> {
+        if let Some(bytes) = self.bytes {
+            e.0.write_all(bytes)
+        } else {
+            self.value.encode(e)
+        }
+    }
+}
+
+impl<'a, 'b: 'a, T> Decode<'b> for Memo<'a, T>
+where
+    T: Decode<'b>,
+{
+    type Error = T::Error;
+
+    fn decode(d: &mut crate::Decoder<'b>) -> Result<Self, Self::Error> {
+        let bytes = d.0;
+        let value = T::decode(d)?;
+        let offset = d.0.as_ptr() as usize - bytes.as_ptr() as usize;
+        Ok(Memo {
+            value,
+            bytes: Some(&bytes[..offset]),
+        })
+    }
+}
+
+impl<T> CborLen for Memo<'_, T>
+where
+    T: CborLen,
+{
+    fn cbor_len(&self) -> usize {
+        if let Some(bytes) = self.bytes {
+            bytes.len()
+        } else {
+            self.value.cbor_len()
+        }
+    }
+}
+
 /// Decodes any CBOR data item, keeping its original encoding.
 ///
 /// This can be useful to skip over unknown data items while preserving their exact encoding.
@@ -1182,7 +1267,6 @@ impl CborLen for Any<'_> {
 /// Returns `true` if `value.encode() == bytes`, false otherwise.
 ///
 /// Panics when:
-/// - The encoded size is greater than `16KB.
 /// - The value decoded from `bytes` is not equal to `value`.
 /// - `value.cbor_len() != <encoded-len>`.
 #[cfg(test)]
@@ -1204,10 +1288,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined, tag::Tagged, Memo, test};
+    
     #[test]
     #[cfg(feature = "alloc")]
     fn any() {
-        use crate::{Any, Decode, Decoder, Encode, Encoder, primitive::Undefined, tag::Tagged};
 
         let mut encoder = Encoder(Vec::new());
 
@@ -1236,5 +1321,14 @@ mod tests {
         let mut encoded = Vec::new();
         any.encode(&mut Encoder(&mut encoded)).unwrap();
         assert_eq!(encoded, encoder.0);
+    }
+    
+    const CANNONICAL: &[u8] = &[0x65, b'h', b'e', b'l', b'l', b'o'];
+    const VARIANT: &[u8] = &[0x78, 0x05, b'h', b'e', b'l', b'l', b'o'];
+
+    #[test]
+    fn memo() {
+        assert!(test(Memo::from("hello"), CANNONICAL).unwrap());
+        assert!(!test(Memo::<&str>::from("hello"), VARIANT).unwrap());
     }
 }
