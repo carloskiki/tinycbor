@@ -5,11 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-# 0.14.0 (0.15.4-derive) - 2026-07-24
+
+# 0.15.0 - 2026-07-29
 
 ### Changed
 
-CBOR length arguments now correctly take `u64` instead of `usize`.
+- `With` renamed to `Memo`, and now optionally stores the encoded form of the value.
+
+### Removed
+
+- `Lazy` type and the `encoded` module.
+
+# 0.14.0 (0.15.4-derive) - 2026-07-28
+
+### Changed
+
+- CBOR length arguments now correctly take `u64` instead of `usize`.
 
 # 0.13.0 (0.15.3-derive) - 2026-07-24
 
